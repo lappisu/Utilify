@@ -1,3 +1,12 @@
+### Update log - Nov 13, 25.
+
+A) the player-type counter is now clickable
+b) quickfriendsV3 released, now it is: draggable & closable (&openable)
+c) Added button to each *text-input-field (it is buggy right now  I know) that disables/enables dot obfuscation ( dot into 2%E thing ) on a whim, also fixed youtube filtering so now yt domain wont get dots obfuscated in pots
+d) fixed 'snow' filter for profil bg and adjusted rain
+e) fixed friend-current-location, now it works everywhere and not just on /profile/ (takes 5 seconds to load)
+
+
 # Utilify (Rewrite)
 
 > ✨ Modern rewrite of the original **Utilify** Tampermonkey addon, focused on modularity, minimalism, and cleaner architecture.  
