@@ -1,10 +1,13 @@
-### Update log - Nov 13, 25.
+### Update log - Nov 19, 25.
 
-A) the player-type counter is now clickable  
-b) quickfriendsV3 released, now it is: draggable & closable (&openable)  
-c) Added button to each *text-input-field (it is buggy right now  I know) that disables/enables dot obfuscation ( dot into 2%E thing ) on a whim, also fixed youtube filtering so now yt domain wont get dots obfuscated in posts  
-d) fixed 'snow' filter for profil bg and adjusted rain  
-e) fixed friend-current-location, now it works everywhere and not just on /profile/ (takes 5 seconds to load)  
+A) Rewrite of the config menu   
+B) Added Manual Update Check on Button click for safety   
+C) Added back Expermental options (*Appear OFfline & IMG Processing)    
+D) Removed Reduntant Code - AvatarFinderV3 is currently broken.   
+E) Added Script tag ``@run-at document-start``, now everything should properly load.   
+F) Fixed & Slightly Improved ``Blur Sensitive Data``.     
+G) Config window no longer appears in positions that would make it impossible to move.  
+
 
 
 # Utilify (Rewrite)
