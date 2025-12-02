@@ -2782,10 +2782,10 @@ GM_addStyle(`
       background-size: 400% 100%;
       font-weight: bold;
       }
+      .css-bho9d5 {     color: rgba(0, 0, 0, 0.1) !important; }
       .css-bho9d5 svg {
     fill: #fff !important;
     stroke: #fff !important;
-    color: rgba(0, 0, 0, 0.1) !important;
 }
       ._1u05O { color: white !important; }
       ._1q4mD ._1sUGu ._1u05O ._3RptD { color: white !important; }
