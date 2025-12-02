@@ -32,10 +32,10 @@ The table below outlines features within the script that may violate the above g
 
 ## 🗒️ Update Log - November 19, 2025 (v2.0.4)
 
-* **A) Configuration Menu Overhaul:** The config menu has been completely rewritten for a modern, modular, and functional user interface.
-* **B) Safety Addition:** Added a **Manual Update Check** function accessible via a button in the settings panel.
-* **C) Experimental Re-enabled:** Re-enabled optional modules including **Appear Offline** (which blocks status updates) and **Image Background Processing** (client-side image filter).
-* **D) Code Maintenance:** Removed redundant code. The **AvatarFinderV3** module is currently non-functional and has been removed from the script.
+* **A) Configuration Menu Overhaul:** Create & Moved multiple options under ``Use At Own Risk`` Category.
+* **B) Feature Added:** Implemented [LazyStreakKeeper](https://github.com/midweststatic/LazyStreakKeeper).
+* **C) WebGL Fix:** SVG Button to add settings no longer displays and attaches to WebGL windows.
+* **D) Proper Credits:** Decided to finally creater proper Credits, kinda.
 * **E) Load Fix:** Implemented the Tampermonkey tag ``@run-at document-start`` to ensure all script components load reliably before the page renders.
 * **F) Fix/Improvement:** The **Blur Sensitive Data** feature has been fixed and slightly improved.
 * **G) UI Fix:** Config window logic was updated to prevent it from appearing in positions that would make it impossible to move or interact with.
