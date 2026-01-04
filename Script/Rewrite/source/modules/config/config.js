@@ -1,11 +1,11 @@
-
 (function() {
     'use strict';
+
     const CONFIG = {
       PANEL_ID: 'utilify_panel',
       STYLE_ID: 'utilify_style',
       STORAGE_KEY: 'UtilifyConfig',
-      UPDATE_URL: 'https://raw.githubusercontent.com/wintrspark/Utilify/main/Script/Rewrite/Utilify.user.js',
+      UPDATE_URL: 'https://raw.githubusercontent.com/gxthickitty/Utilify/main/Script/Rewrite/Utilify.user.js',
       
       defaults: {
         gradient: null,
@@ -26,6 +26,7 @@
         lazyStreakKeeper: false
       }
     };
+  
 
     const Storage = {
       get(key, fallback) {
@@ -54,6 +55,7 @@
       }
     };
   
+
     function getProfileIdFromBootstrap() {
       const scripts = document.querySelectorAll('script');
       for (let script of scripts) {
@@ -551,7 +553,7 @@
       applyPrivacy(cfg) {
         let css = '';
         if (cfg.disableFriendslist) css += `._1Yhgq{display:none!important}\n`;
-        if (cfg.blurSensitive) css += `.css-k9ok3b,.css-b2nqhh{filter:blur(8px);transition:filter .25s ease}\n.css-k9ok3b:hover,.css-b2nqhh:hover{filter:blur(0)}\n`;
+        if (cfg.blurSensitive) css += `._13UrL .kR267 ._9smi2 ._1rJI8 ._1aUa_{filter:blur(8px);transition:filter .25s ease}\n._13UrL .kR267 ._9smi2 ._1rJI8 ._1aUa_:hover{filter:blur(0)}\n._3zDi-{filter:blur(8px);transition:filter .25s ease}\n._3zDi-:hover{filter:blur(0)}\n._2O_AH{filter:blur(8px);transition:filter .25s ease}\n._2O_AH:hover{filter: blur(0)}\n._3hI0M{filter:blur(8px);transition:filter .25s ease}\n._3hI0M:hover{filter: blur(0)}\n._2IqY6{filter:blur(8px);transition:filter .25s ease}\n._2IqY6:hover{filter: blur(0)}\n.css-1hitfzb{filter:blur(8px);transition:filter .25s ease}\n.css-1hitfzb:hover{filter: blur(0)}`;
         if (cfg.blurComments) css += `._3Wsxf{filter:blur(8px);transition:filter .25s ease}\n._3Wsxf:hover{filter:none}\n`;
         this.inject('utilify_privacy', css);
       },
@@ -563,7 +565,7 @@
         }
         const { radius, hue, alpha } = cfg.glassPanels;
         this.inject('utilify_glass', `
-          ._3TORb ._2E1AL .tRx6U, .css-1wbcikz, .css-wog98n, .css-o4yc28, .css-z05bui {
+          ._3TORb ._2E1AL .tRx6U, .css-1wbcikz, .css-wog98n, .css-o4yc28, .css-z05bui, ._3TORb {
             background-color: hsla(${hue},68%,43%,${alpha}) !important;
             backdrop-filter: blur(6px) !important;
             border-radius: ${radius}px !important;
@@ -592,12 +594,10 @@
       },
   
       applyFont(fontName, fontUrl) {
-        // Remove existing font links
         document.querySelectorAll('link[data-utilify-font]').forEach(el => el.remove());
         document.querySelectorAll('style[data-utilify-font-style]').forEach(el => el.remove());
         
         if (!fontName || !fontUrl) {
-          // Reset to default
           const st = document.createElement('style');
           st.dataset.utilifyFontStyle = '1';
           st.textContent = `* { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important; }`;
@@ -605,7 +605,6 @@
           return;
         }
   
-        // Load font
         const link = document.createElement('link');
         link.rel = 'stylesheet';
         link.href = fontUrl;
@@ -629,7 +628,7 @@
         } catch {}
       }
     };
-
+  
     const RiskyFeatures = {
       pulseBlocker: { installed: false },
       friendActivity: { timer: null, observer: null, profileId: null },
@@ -897,7 +896,7 @@
         }
       }
     };
-  
+
     const UI = {
       panel: null,
       
@@ -1065,22 +1064,22 @@
             <div style="text-align:center; padding:20px 0;">
               <h3 style="color:#ffc0cb; margin-bottom:16px; font-size:20px;">✦ Utilify V2 ✦</h3>
               <p class="small-note" style="font-size:13px; line-height:1.8; margin-bottom:24px;">
-                Ethereal Edition<br>
-                Refactored & Optimized<br><br>
-                Maintained by <a href="https://www.kogama.com/profile/24051519/" target="_blank">Simon</a>
+                Made by Community For Community.<br>
+                A project of passion & love.<br><br>
+                Fully maintained by <a href="https://www.github.com/gxthickitty/utilify" target="_blank">Simon</a>
               </p>
               <div style="border-top:1px solid rgba(255,255,255,0.1); padding-top:20px;">
                 <h4 style="color:#c8bed8; font-size:14px; margin-bottom:16px;">Contributors</h4>
                 <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:12px; font-size:13px; color:#a8a8b8;">
-                  <div><a href="https://www.kogama.com/profile/17037147/" target="_blank">S.</a></div>
-                  <div><a href="https://www.kogama.com/profile/669433161/" target="_blank">S.</a></div>
-                  <div><a href="https://www.kogama.com/profile/36355/" target="_blank">UDONGEIN</a></div>
-                  <div>Alice</div>
-                  <div>Bob</div>
-                  <div>Charlie</div>
-                  <div>Dave</div>
-                  <div>Eve</div>
-                  <div>Frank</div>
+                  <div>Death Wolf.</div>
+                  <div>Snowy</div>
+                  <div>Awoi</div>
+                  <div>Selene</div>
+                  <div>Tungsten</div>
+                  <div>Raptor</div>
+                  <div>Comenxo</div>
+                  <div>Idealism</div>
+                  <div>Sorry</div>
                 </div>
                 <p class="small-note" style="margin-top:16px;">Thank you to all testers and supporters! ✨</p>
               </div>
@@ -1100,10 +1099,9 @@
           });
         });
         
-        // Close button
         this.panel.querySelector('.close').addEventListener('click', () => this.hide());
         
-        // Gradient controls - LIVE UPDATES
+        // Gradient controls
         const angleInput = this.panel.querySelector('#gradient-angle');
         const angleVal = this.panel.querySelector('#angle-val');
         const color1 = this.panel.querySelector('#color1');
@@ -1251,7 +1249,6 @@
           Styles.applyGlass(cfg);
         }, 150));
   
-        // Online styles
         this.panel.querySelector('#online-styles').addEventListener('change', (e) => {
           const cfg = Storage.getConfig();
           cfg.onlineStyles = e.target.value;
@@ -1259,7 +1256,6 @@
           Styles.loadOnlineCSS(cfg.onlineStyles);
         });
         
-        // Custom CSS
         this.panel.querySelector('#custom-css').addEventListener('change', (e) => {
           const cfg = Storage.getConfig();
           cfg.customCSS = e.target.value;
@@ -1267,7 +1263,6 @@
           Styles.applyCustomCSS(cfg.customCSS);
         });
   
-        // Fonts
         this.panel.querySelector('#main-font').addEventListener('change', (e) => {
           const cfg = Storage.getConfig();
           cfg.fontFamily = e.target.value;
@@ -1436,7 +1431,7 @@
       btn.addEventListener('click', () => UI.show());
       document.body.appendChild(btn);
     }
-
+  
     function init() {
       Styles.initBase();
       UI.create();
@@ -1449,7 +1444,6 @@
       Styles.applyCustomCSS(cfg.customCSS);
       Styles.loadOnlineCSS(cfg.onlineStyles);
   
-      // Apply fonts
       if (cfg.fontFamily === 'roboto') {
         Styles.applyFont('Roboto', 'https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap');
       } else if (cfg.fontFamily === 'comfortaa') {
@@ -1458,7 +1452,6 @@
         Styles.loadOnlineFont(cfg.onlineFont);
       }
   
-      // Apply risky features if enabled
       if (cfg.appearOffline) RiskyFeatures.installPulseBlocker();
       if (cfg.friendActivity) RiskyFeatures.enableFriendActivity();
       if (cfg.playerTypeDisplay) RiskyFeatures.enablePlayerTypeDisplay();
@@ -1470,11 +1463,11 @@
     } else {
       init();
     }
-  
-    // Cleanup on unload
+
     window.addEventListener('beforeunload', () => {
       RiskyFeatures.disableFriendActivity();
       RiskyFeatures.disablePlayerTypeDisplay();
       RiskyFeatures.disableStreakKeeper();
     });
   })();
+
