@@ -1,22 +1,6 @@
-// ==UserScript==
-// @name         Utilify V2 - Ethereal Edition
-// @namespace    http://tampermonkey.net/
-// @version      2.0.0
-// @description  Beautiful, performant website enhancement inspired by moonlight
-// @author       Simon
-// @match        https://www.kogama.com/*
-// @grant        GM_getValue
-// @grant        GM_setValue
-// @grant        GM_info
-// ==/UserScript==
 
 (function() {
     'use strict';
-  
-    // ============================================================================
-    // CONFIGURATION
-    // ============================================================================
-    
     const CONFIG = {
       PANEL_ID: 'utilify_panel',
       STYLE_ID: 'utilify_style',
@@ -42,11 +26,7 @@
         lazyStreakKeeper: false
       }
     };
-  
-    // ============================================================================
-    // STORAGE MODULE
-    // ============================================================================
-    
+
     const Storage = {
       get(key, fallback) {
         try {
@@ -74,10 +54,6 @@
       }
     };
   
-    // ============================================================================
-    // UTILITY FUNCTIONS
-    // ============================================================================
-    
     function getProfileIdFromBootstrap() {
       const scripts = document.querySelectorAll('script');
       for (let script of scripts) {
@@ -104,10 +80,6 @@
       };
     }
   
-    // ============================================================================
-    // STYLES MODULE
-    // ============================================================================
-    
     const Styles = {
       inject(id, css) {
         let el = document.getElementById(id);
@@ -657,11 +629,7 @@
         } catch {}
       }
     };
-  
-    // ============================================================================
-    // RISKY FEATURES MODULE
-    // ============================================================================
-  
+
     const RiskyFeatures = {
       pulseBlocker: { installed: false },
       friendActivity: { timer: null, observer: null, profileId: null },
@@ -930,10 +898,6 @@
       }
     };
   
-    // ============================================================================
-    // UI MODULE
-    // ============================================================================
-    
     const UI = {
       panel: null,
       
@@ -1432,11 +1396,7 @@
         this.panel.querySelector('#lazy-streak').checked = cfg.lazyStreakKeeper;
       }
     };
-  
-    // ============================================================================
-    // SETTINGS BUTTON
-    // ============================================================================
-    
+
     function createSettingsButton() {
       const btn = document.createElement('button');
       btn.id = 'utilify_settings_btn';
@@ -1476,11 +1436,7 @@
       btn.addEventListener('click', () => UI.show());
       document.body.appendChild(btn);
     }
-  
-    // ============================================================================
-    // INITIALIZATION
-    // ============================================================================
-    
+
     function init() {
       Styles.initBase();
       UI.create();
