@@ -61,7 +61,7 @@ While Tampermonkey is the traditional choice, we highly recommend **ScriptCat** 
 
 ### Step 2: Install Utilify
 Once your manager is ready, click the link below to install:
-👉 [**Install Utilify (Ethereal Edition)**](https://raw.githubusercontent.com/gxthickitty/Utilify/refs/heads/main/Utilify.user.js)
+👉 [**Install Utilify (Ethereal Edition)**](https://github.com/gxthickitty/Utilify/raw/refs/heads/main/Script/Rewrite/Utilify.user.js)
 
 ***
 
