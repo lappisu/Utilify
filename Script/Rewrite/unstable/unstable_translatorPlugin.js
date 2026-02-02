@@ -8,11 +8,9 @@
     let userLang = "off";
     let lastChatUser = null;
     let translationCache = new Map();
-    let translationQueue = new Set(); // Prevent duplicate translations
+    let translationQueue = new Set();
     let isPageTranslating = false;
     let userLocale = null;
-
-    // locale code map
     const LOCALE_TO_LANG = {
         'en_US': 'en', 'en_GB': 'en', 'en': 'en',
         'es_ES': 'es', 'es_MX': 'es', 'es': 'es',
@@ -34,12 +32,22 @@
         'zh_CN': 'zh', 'zh_TW': 'zh', 'zh': 'zh'
     };
 
-    // Elements to exclude from translation
+    const LANG_NAMES = {
+        'en': 'English', 'es': 'Spanish', 'pt': 'Portuguese',
+        'fr': 'French', 'de': 'German', 'it': 'Italian',
+        'ru': 'Russian', 'pl': 'Polish', 'tr': 'Turkish',
+        'nl': 'Dutch', 'sv': 'Swedish', 'cs': 'Czech',
+        'sk': 'Slovak', 'ro': 'Romanian', 'ar': 'Arabic',
+        'ja': 'Japanese', 'ko': 'Korean', 'zh': 'Chinese'
+    };
+
     const EXCLUDE_SELECTORS = [
         'script', 'style', 'code', 'pre', 'svg', 'path',
         'input[type="password"]', 'input[type="email"]',
-        '[contenteditable="true"]', '[data-no-translate]'
+        '[contenteditable="true"]', '[data-no-translate]',
+        '.translation-label' // Exclude our own translation labels
     ];
+
     function detectUserLocale() {
         try {
             if (window.App && window.App.options && window.App.options.bootstrap) {
@@ -134,6 +142,53 @@
             }
         });
     }
+
+    function createTranslationLabel(sourceLang, element) {
+        const existingLabel = element.querySelector('.translation-label');
+        if (existingLabel) {
+            existingLabel.remove();
+        }
+
+        const label = document.createElement('span');
+        label.className = 'translation-label';
+        label.style.cssText = `
+            display: block;
+            font-size: 10px;
+            color: #888;
+            margin-top: 2px;
+            font-style: italic;
+            cursor: pointer;
+            user-select: none;
+        `;
+        
+        const langName = LANG_NAMES[sourceLang] || sourceLang.toUpperCase();
+        label.innerHTML = `Translated from ${langName} • <span style="text-decoration: underline;">Show original</span>`;
+        
+        let showingOriginal = false;
+        label.onclick = (e) => {
+            e.stopPropagation();
+            showingOriginal = !showingOriginal;
+            
+            if (showingOriginal) {
+                // Show original
+                const textNode = Array.from(element.childNodes).find(n => n.nodeType === Node.TEXT_NODE);
+                if (textNode && element.dataset.originalText) {
+                    textNode.textContent = element.dataset.originalText;
+                }
+                label.innerHTML = `Translated from ${langName} • <span style="text-decoration: underline;">Show translation</span>`;
+            } else {
+                // Show translation
+                const textNode = Array.from(element.childNodes).find(n => n.nodeType === Node.TEXT_NODE);
+                if (textNode && element.dataset.translatedText) {
+                    textNode.textContent = element.dataset.translatedText;
+                }
+                label.innerHTML = `Translated from ${langName} • <span style="text-decoration: underline;">Show original</span>`;
+            }
+        };
+        
+        return label;
+    }
+
     function findChatContainer() {
         return document.querySelector("._2XaOw") ||
                document.querySelector("[style*='overflow-y']");
@@ -274,6 +329,8 @@
         if (currentLang === "off") {
             p.innerText = node.dataset.originalText;
             node.dataset.translated = "";
+            const label = node.querySelector('.translation-label');
+            if (label) label.remove();
             return;
         }
 
@@ -281,8 +338,14 @@
 
         translate(node.dataset.originalText, currentLang, (t, detected) => {
             if (detected === currentLang) return;
-            p.innerText = t;
-            node.dataset.translated = currentLang;
+            if (t !== node.dataset.originalText) {
+                p.innerText = t;
+                node.dataset.translatedText = t;
+                node.dataset.translated = currentLang;
+                node.dataset.detectedLang = detected;
+                
+                p.appendChild(createTranslationLabel(detected, p));
+            }
         });
     }
 
@@ -301,6 +364,55 @@
         );
         o.observe(c, { childList: true, subtree: true });
         c._observer = o;
+    }
+
+    function detectLanguage(text) {
+        // Simple heuristic-based language detection for common patterns
+        const patterns = {
+            en: /\b(the|and|or|is|are|was|were|have|has|been|will|would|could|should|may|might|can|do|does|did|not|but|for|with|from|this|that|these|those)\b/gi,
+            es: /\b(el|la|los|las|de|que|en|un|una|por|con|para|como|es|son|está|están|fue|fueron|ser|estar|haber|hacer|tener|poder|decir|ir|ver|dar|saber|querer)\b/gi,
+            pt: /\b(o|a|os|as|de|que|em|um|uma|por|com|para|não|se|mais|como|mas|eu|ele|ela|você|fazer|ter|estar|ser|poder|dizer|ir|ver|dar|saber|querer)\b/gi,
+            fr: /\b(le|la|les|de|un|une|des|et|ou|est|sont|été|être|avoir|faire|dire|aller|voir|savoir|pouvoir|vouloir|venir|devoir|prendre|donner|mettre|parler)\b/gi,
+            de: /\b(der|die|das|den|dem|des|ein|eine|und|oder|ist|sind|war|waren|sein|haben|werden|können|müssen|sollen|wollen|machen|gehen|sehen|wissen|sagen)\b/gi,
+            ru: /[а-яА-ЯёЁ]{3,}/g,
+            pl: /\b(i|w|z|na|do|o|się|że|nie|jest|są|był|była|było|były|być|mieć|móc|chcieć|wiedzieć|robić|iść|widzieć|jak|co|to|ten|ta|te|który)\b/gi,
+            ar: /[\u0600-\u06FF]{3,}/g,
+            ja: /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]{2,}/g,
+            ko: /[\uAC00-\uD7AF]{2,}/g,
+            zh: /[\u4E00-\u9FFF]{2,}/g
+        };
+
+        const counts = {};
+        for (const lang in patterns) {
+            const matches = text.match(patterns[lang]);
+            counts[lang] = matches ? matches.length : 0;
+        }
+
+        let maxCount = 0;
+        let detectedLang = null;
+        for (const lang in counts) {
+            if (counts[lang] > maxCount) {
+                maxCount = counts[lang];
+                detectedLang = lang;
+            }
+        }
+        return maxCount >= 3 ? detectedLang : null;
+    }
+
+    function shouldTranslateText(text, targetLang) {
+        if (text.length < 5) return false;
+
+        const detected = detectLanguage(text);
+        if (detected === targetLang) {
+            return false;
+        }
+
+        const alphaCount = (text.match(/[a-zA-Z\u0080-\uFFFF]/g) || []).length;
+        if (alphaCount < text.length * 0.3) {
+            return false;
+        }
+
+        return true;
     }
 
     function shouldTranslateElement(element) {
@@ -348,7 +460,10 @@
             const originalText = textNode.textContent.trim();
             
             if (!originalText || originalText.length < 2) return;
-            
+            if (!shouldTranslateText(originalText, userLang)) {
+                return;
+            }
+
             if (!parent.dataset.originalText) {
                 parent.dataset.originalText = originalText;
             }
@@ -360,11 +475,17 @@
             translate(originalText, userLang, (translated, detected) => {
                 translationQueue.delete(queueKey);
                 
-                // Don't translate if detected language matches target
+
                 if (detected === userLang) return;
-                if (textNode.parentElement === parent) {
+                if (translated !== originalText && textNode.parentElement === parent) {
                     textNode.textContent = translated;
+                    parent.dataset.translatedText = translated;
                     parent.dataset.translated = userLang;
+                    parent.dataset.detectedLang = detected;
+                    
+                    if (parent.tagName.match(/^(P|H[1-6]|DIV|LI|TD|TH)$/)) {
+                        parent.appendChild(createTranslationLabel(detected, parent));
+                    }
                 }
             });
         });
@@ -376,7 +497,6 @@
         isPageTranslating = true;
         console.log('[Auto-Translator] Starting page translation to:', userLang);
 
-        // Translate in batches to avoid overwhelming the API
         const elementsToTranslate = document.querySelectorAll('p, h1, h2, h3, h4, h5, h6, span, div, a, button, label, li, td, th');
         
         let batchIndex = 0;
@@ -409,27 +529,39 @@
             if (textNode && el.dataset.originalText) {
                 textNode.textContent = el.dataset.originalText;
                 delete el.dataset.translated;
+                delete el.dataset.translatedText;
+                delete el.dataset.detectedLang;
             }
+            const label = el.querySelector('.translation-label');
+            if (label) label.remove();
         });
     }
 
     function observePageChanges() {
         if (document.body._pageObserver) return;
 
+        let pendingNodes = new Set();
+
         const observer = new MutationObserver((mutations) => {
             if (userLang === "off") return;
             
-            // Debounce translation
+            mutations.forEach(mutation => {
+                mutation.addedNodes.forEach(node => {
+                    if (node.nodeType === Node.ELEMENT_NODE) {
+                        pendingNodes.add(node);
+                    }
+                });
+            });
+
+            // Debounce translation - wait 3 seconds before processing batch
             clearTimeout(observer._debounce);
             observer._debounce = setTimeout(() => {
-                mutations.forEach(mutation => {
-                    mutation.addedNodes.forEach(node => {
-                        if (node.nodeType === Node.ELEMENT_NODE) {
-                            translatePageElement(node);
-                        }
-                    });
+                console.log(`[Auto-Translator] Processing ${pendingNodes.size} new elements`);
+                pendingNodes.forEach(node => {
+                    translatePageElement(node);
                 });
-            }, 500);
+                pendingNodes.clear();
+            }, 3000); // 3 seconds
         });
 
         observer.observe(document.body, {
@@ -438,7 +570,9 @@
         });
 
         document.body._pageObserver = observer;
+        console.log('[Auto-Translator] Page observer started with 3s debounce');
     }
+
     function createGlobalToggle() {
         if (document.getElementById('tm-global-toggle')) return;
 
@@ -469,13 +603,15 @@
         toggle.onclick = () => {
             if (userLang === "off") {
                 userLang = getLanguageFromLocale(userLocale);
+                GM_setValue('globalLang', userLang);
+                isPageTranslating = false;
                 translateEntirePage();
             } else {
                 userLang = "off";
+                GM_setValue('globalLang', userLang);
                 restoreOriginalPage();
             }
             updateToggleText();
-            GM_setValue('globalLang', userLang);
         };
 
         document.body.appendChild(toggle);
@@ -483,8 +619,6 @@
   
     function initialize() {
         console.log('[Auto-Translator] Initializing...');
-
-        // Detect user locale
         userLocale = detectUserLocale();
         const detectedLang = getLanguageFromLocale(userLocale);
         
@@ -495,7 +629,6 @@
         
         console.log('[Auto-Translator] Active language:', userLang);
 
-        // Start translation if enabled
         if (userLang !== "off") {
             translateEntirePage();
         }
@@ -504,13 +637,13 @@
 
         console.log('[Auto-Translator] Initialization complete');
     }
+
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', initialize);
     } else {
         initialize();
     }
 
-    // Chat-specific
     setInterval(() => {
         const chatUser = getChatUser();
         if (chatUser && chatUser !== lastChatUser) {
