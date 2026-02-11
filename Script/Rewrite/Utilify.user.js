@@ -37,6 +37,688 @@
     document.documentElement.appendChild(style);
 })();
 
+(async function() {
+    "use strict";
+    
+    const AVAILABLE_FILTERS = ["rain", "snow", "fireflies", "roses", "sparkles"];
+    const AVAILABLE_MODIFIERS = ["blur", "dark"];
+
+    const SNOWFLAKE_SVGS = [
+        "data:image/svg+xml," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><path fill="white" d="M50,10 L55,45 L50,50 L45,45 Z M50,90 L55,55 L50,50 L45,55 Z M10,50 L45,55 L50,50 L45,45 Z M90,50 L55,55 L50,50 L55,45 Z M25,25 L45,45 L50,40 L40,30 Z M75,75 L55,55 L50,60 L60,70 Z M75,25 L55,45 L60,50 L70,40 Z M25,75 L45,55 L40,50 L30,60 Z"/><circle cx="50" cy="50" r="8" fill="white"/></svg>`),
+        "data:image/svg+xml," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><g fill="white"><rect x="47" y="5" width="6" height="90" rx="2"/><rect x="5" y="47" width="90" height="6" rx="2"/><rect x="47" y="5" width="6" height="90" rx="2" transform="rotate(45 50 50)"/><rect x="47" y="5" width="6" height="90" rx="2" transform="rotate(-45 50 50)"/><circle cx="50" cy="50" r="10"/></g></svg>`)
+    ];
+
+    const ROSE_SVG = "data:image/svg+xml," + encodeURIComponent(`
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+            <defs>
+                <radialGradient id="roseGrad" cx="50%" cy="40%">
+                    <stop offset="0%" style="stop-color:#ff6b9d;stop-opacity:1" />
+                    <stop offset="60%" style="stop-color:#c9184a;stop-opacity:1" />
+                    <stop offset="100%" style="stop-color:#a4133c;stop-opacity:1" />
+                </radialGradient>
+            </defs>
+            <path fill="url(#roseGrad)" d="M50 20c-4 0-7 3-9 6-2-3-5-6-9-6-6 0-11 5-11 11 0 8 9 16 20 26 11-10 20-18 20-26 0-6-5-11-11-11z"/>
+            <ellipse cx="50" cy="30" rx="8" ry="10" fill="#ff8fa3" opacity="0.6"/>
+            <path d="M45 35c0 3 2 5 5 5s5-2 5-5" stroke="#c9184a" stroke-width="1.5" fill="none"/>
+            <path fill="#2d6a4f" d="M50 46l-2 8c-1 4 0 8 3 10l-1-18zm0 0l2 8c1 4 0 8-3 10l1-18z"/>
+        </svg>
+    `);
+
+    const SPARKLE_SVG = "data:image/svg+xml," + encodeURIComponent(`
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+            <defs>
+                <radialGradient id="sparkleGrad">
+                    <stop offset="0%" style="stop-color:#4adeb7;stop-opacity:1" />
+                    <stop offset="50%" style="stop-color:#6ef0cb;stop-opacity:0.8" />
+                    <stop offset="100%" style="stop-color:#2a9d8f;stop-opacity:0" />
+                </radialGradient>
+            </defs>
+            <circle cx="50" cy="50" r="45" fill="url(#sparkleGrad)"/>
+            <path fill="#fff" d="M50 10l3 37 37 3-37 3-3 37-3-37-37-3 37-3z"/>
+        </svg>
+    `);
+
+    let tooltip = null;
+
+    function injectTooltipStyles() {
+        if (document.getElementById('bg-effects-tooltip-style')) return;
+        
+        const css = `
+            @keyframes tooltip-slide-in {
+                from { 
+                    opacity: 0;
+                    transform: translateY(5px);
+                }
+                to { 
+                    opacity: 1;
+                    transform: translateY(0);
+                }
+            }
+            
+            .bg-effects-tooltip {
+                animation: tooltip-slide-in 0.2s ease-out;
+            }
+            
+            .bg-effects-badge {
+                display: inline-block;
+                padding: 4px 10px;
+                margin: 3px 2px;
+                background: linear-gradient(135deg, rgba(74, 222, 183, 0.15), rgba(42, 157, 143, 0.1));
+                border: 1px solid rgba(74, 222, 183, 0.25);
+                border-radius: 6px;
+                font-size: 11px;
+                font-weight: 600;
+                color: #4adeb7;
+                letter-spacing: 0.3px;
+                transition: all 0.2s ease;
+            }
+            
+            .bg-effects-badge:hover {
+                background: linear-gradient(135deg, rgba(74, 222, 183, 0.25), rgba(42, 157, 143, 0.15));
+                border-color: rgba(74, 222, 183, 0.4);
+                transform: translateY(-1px);
+            }
+            
+            .bg-effects-section {
+                margin-bottom: 10px;
+            }
+            
+            .bg-effects-section-title {
+                font-size: 10px;
+                text-transform: uppercase;
+                letter-spacing: 0.8px;
+                color: rgba(74, 222, 183, 0.6);
+                margin-bottom: 6px;
+                font-weight: 500;
+            }
+        `;
+        
+        const style = document.createElement('style');
+        style.id = 'bg-effects-tooltip-style';
+        style.textContent = css;
+        document.head.appendChild(style);
+    }
+
+    function showTooltip(target) {
+        if (tooltip) return;
+        
+        injectTooltipStyles();
+        
+        tooltip = document.createElement("div");
+        tooltip.className = 'bg-effects-tooltip';
+        Object.assign(tooltip.style, {
+            position: "fixed",
+            zIndex: "100000",
+            background: "linear-gradient(135deg, rgba(13, 31, 29, 0.98), rgba(26, 47, 45, 0.98))",
+            color: "#e0f0ee",
+            padding: "12px 16px",
+            borderRadius: "10px",
+            border: "1px solid rgba(74, 222, 183, 0.25)",
+            fontSize: "12px",
+            boxShadow: "0 6px 24px rgba(74, 222, 183, 0.2), inset 0 1px 0 rgba(74, 222, 183, 0.15)",
+            pointerEvents: "none",
+            backdropFilter: "blur(12px)",
+            fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+            maxWidth: "280px"
+        });
+        
+        const effectBadges = AVAILABLE_FILTERS.map(f => 
+            `<span class="bg-effects-badge">${f}</span>`
+        ).join('');
+        
+        const modifierBadges = AVAILABLE_MODIFIERS.map(m => 
+            `<span class="bg-effects-badge">${m}</span>`
+        ).join('');
+        
+        tooltip.innerHTML = `
+            <div class="bg-effects-section">
+                <div class="bg-effects-section-title">◆ Effects</div>
+                <div>${effectBadges}</div>
+            </div>
+            <div class="bg-effects-section">
+                <div class="bg-effects-section-title">◆ Modifiers</div>
+                <div>${modifierBadges}</div>
+            </div>
+            <div style="margin-top:8px; font-size:10px; color:rgba(74, 222, 183, 0.5); font-style:italic;">
+                filter: effect1, modifier1, ...
+            </div>
+        `;
+        
+        document.body.appendChild(tooltip);
+        updateTooltipPos(target);
+    }
+
+    function updateTooltipPos(target) {
+        if (!tooltip) return;
+        const r = target.getBoundingClientRect();
+        const tooltipHeight = tooltip.offsetHeight;
+        const tooltipWidth = tooltip.offsetWidth;
+        
+        // Position to the right of the textarea if there's space
+        const spaceOnRight = window.innerWidth - r.right;
+        if (spaceOnRight > tooltipWidth + 20) {
+            tooltip.style.left = (r.right + 10) + "px";
+            tooltip.style.top = r.top + "px";
+        } else {
+            // Otherwise position above
+            tooltip.style.left = Math.max(10, r.left) + "px";
+            tooltip.style.top = Math.max(10, r.top - tooltipHeight - 10) + "px";
+        }
+    }
+
+    function removeTooltip() {
+        if (tooltip) {
+            tooltip.style.opacity = '0';
+            tooltip.style.transform = 'translateY(-5px)';
+            setTimeout(() => {
+                tooltip?.remove();
+                tooltip = null;
+            }, 200);
+        }
+    }
+
+    // Bootstrap reader
+    const waitForBootstrap = () => new Promise(resolve => {
+        const check = () => {
+            const desc = window.__capturedBootstrap?.object?.description || 
+                        window.__capturedBootstrap?.current_user?.description;
+            
+            if (desc) {
+                resolve(desc);
+            } else {
+                requestAnimationFrame(check);
+            }
+        };
+        check();
+    });
+
+    class ParticleSystem {
+        constructor(targetEl) {
+            this.target = targetEl;
+            this.canvas = document.createElement("canvas");
+            this.ctx = this.canvas.getContext("2d", { alpha: true });
+            this.dpr = window.devicePixelRatio || 1;
+            this.particles = [];
+            this.container = document.createElement("div");
+            
+            Object.assign(this.container.style, {
+                position: "absolute",
+                pointerEvents: "none",
+                zIndex: "9",
+                overflow: "hidden"
+            });
+            
+            this.canvas.style.width = "100%";
+            this.canvas.style.height = "100%";
+            this.container.appendChild(this.canvas);
+            document.body.appendChild(this.container);
+            
+            this.observer = new ResizeObserver(() => this.resize());
+            this.observer.observe(this.target);
+            this.loop = this.loop.bind(this);
+        }
+
+        resize() {
+            const r = this.target.getBoundingClientRect();
+            this.container.style.top = r.top + scrollY + "px";
+            this.container.style.left = r.left + scrollX + "px";
+            this.container.style.width = r.width + "px";
+            this.container.style.height = r.height + "px";
+            this.w = r.width;
+            this.h = r.height;
+            this.canvas.width = this.w * this.dpr;
+            this.canvas.height = this.h * this.dpr;
+            this.ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+        }
+
+        start() {
+            this.resize();
+            this.initParticles();
+            requestAnimationFrame(this.loop);
+            
+            const scrollHandler = () => this.resize();
+            addEventListener("scroll", scrollHandler);
+            this.cleanup = () => removeEventListener("scroll", scrollHandler);
+        }
+
+        loop() {
+            if (!document.contains(this.container)) {
+                this.cleanup?.();
+                return;
+            }
+            this.ctx.clearRect(0, 0, this.w, this.h);
+            this.updateAndDraw();
+            requestAnimationFrame(this.loop);
+        }
+
+        destroy() {
+            this.observer?.disconnect();
+            this.container?.remove();
+            this.cleanup?.();
+        }
+    }
+
+    class RainSystem extends ParticleSystem {
+        initParticles() {
+            for (let i = 0; i < 60; i++) {
+                this.particles.push(this.reset({}));
+            }
+        }
+        
+        reset(p) {
+            p.x = Math.random() * this.w;
+            p.y = Math.random() * -this.h;
+            p.z = Math.random() * 0.6 + 0.4;
+            p.len = Math.random() * 20 + 15;
+            p.vy = (Math.random() * 8 + 12) * p.z;
+            return p;
+        }
+        
+        updateAndDraw() {
+            this.ctx.lineWidth = 1.5;
+            this.ctx.lineCap = "round";
+            const gradient = this.ctx.createLinearGradient(0, 0, 0, this.h);
+            gradient.addColorStop(0, "rgba(200, 220, 255, 0.4)");
+            gradient.addColorStop(1, "rgba(255, 255, 255, 0.2)");
+            this.ctx.strokeStyle = gradient;
+            
+            this.ctx.beginPath();
+            for (const p of this.particles) {
+                p.y += p.vy;
+                if (p.y > this.h + p.len) this.reset(p);
+                this.ctx.moveTo(p.x, p.y);
+                this.ctx.lineTo(p.x, p.y + p.len * p.z);
+            }
+            this.ctx.stroke();
+        }
+    }
+
+    class SnowSystem extends ParticleSystem {
+        constructor(target) {
+            super(target);
+            this.imgs = SNOWFLAKE_SVGS.map(s => {
+                const img = new Image();
+                img.src = s;
+                return img;
+            });
+            this.start();
+        }
+        
+        initParticles() {
+            for (let i = 0; i < 80; i++) {
+                this.particles.push(this.reset({}));
+            }
+        }
+        
+        reset(p) {
+            p.x = Math.random() * this.w;
+            p.y = Math.random() * -this.h;
+            p.z = Math.random() * 0.6 + 0.4;
+            p.size = (Math.random() * 15 + 12) * p.z;
+            p.vy = (Math.random() * 0.8 + 0.5) * p.z;
+            p.sway = Math.random() * 0.08;
+            p.swayOff = Math.random() * Math.PI * 2;
+            p.rot = Math.random() * 360;
+            p.rotSpeed = (Math.random() - 0.5) * 0.6;
+            p.img = this.imgs[Math.floor(Math.random() * this.imgs.length)];
+            p.alpha = 0.6 + Math.random() * 0.3;
+            return p;
+        }
+        
+        updateAndDraw() {
+            for (const p of this.particles) {
+                p.y += p.vy;
+                p.swayOff += p.sway;
+                p.x += Math.sin(p.swayOff) * 0.6;
+                p.rot += p.rotSpeed;
+                
+                if (p.y > this.h + 30) this.reset(p);
+                
+                this.ctx.save();
+                this.ctx.translate(p.x, p.y);
+                this.ctx.rotate(p.rot * Math.PI / 180);
+                this.ctx.globalAlpha = p.alpha;
+                
+                if (p.img.complete) {
+                    this.ctx.drawImage(p.img, -p.size/2, -p.size/2, p.size, p.size);
+                }
+                
+                this.ctx.restore();
+            }
+        }
+    }
+
+    class FireflySystem extends ParticleSystem {
+        constructor(target) {
+            super(target);
+            this.start();
+        }
+        
+        initParticles() {
+            for (let i = 0; i < 50; i++) {
+                this.particles.push(this.reset({}));
+            }
+        }
+        
+        reset(p) {
+            p.x = Math.random() * this.w;
+            p.y = Math.random() * this.h;
+            p.vx = (Math.random() - 0.5) * 0.8;
+            p.vy = (Math.random() - 0.5) * 0.8;
+            p.phase = Math.random() * Math.PI * 2;
+            p.phaseSpeed = 0.04 + Math.random() * 0.04;
+            p.size = Math.random() * 2 + 1.5;
+            return p;
+        }
+        
+        updateAndDraw() {
+            for (const p of this.particles) {
+                p.x += p.vx;
+                p.y += p.vy;
+                p.phase += p.phaseSpeed;
+                
+                if (p.x < -10) p.x = this.w + 10;
+                if (p.x > this.w + 10) p.x = -10;
+                if (p.y < -10) p.y = this.h + 10;
+                if (p.y > this.h + 10) p.y = -10;
+                
+                const glow = (Math.sin(p.phase) + 1) / 2;
+                const alpha = 0.4 + glow * 0.6;
+                
+                this.ctx.shadowBlur = 20 * glow;
+                this.ctx.shadowColor = "rgba(255, 250, 200, 1)";
+                this.ctx.fillStyle = `rgba(255, 250, 200, ${alpha})`;
+                
+                this.ctx.beginPath();
+                this.ctx.arc(p.x, p.y, p.size + glow * 2, 0, Math.PI * 2);
+                this.ctx.fill();
+                
+                this.ctx.shadowBlur = 0;
+            }
+        }
+    }
+
+    class RoseSystem extends ParticleSystem {
+        constructor(target) {
+            super(target);
+            this.img = new Image();
+            this.img.src = ROSE_SVG;
+            this.start();
+        }
+        
+        initParticles() {
+            for (let i = 0; i < 35; i++) {
+                this.particles.push(this.reset({}));
+            }
+        }
+        
+        reset(p) {
+            p.x = Math.random() * this.w;
+            p.y = Math.random() * -this.h - 50;
+            p.vy = Math.random() * 0.7 + 0.5;
+            p.vx = (Math.random() - 0.5) * 0.3;
+            p.rot = Math.random() * 360;
+            p.rotSpeed = (Math.random() - 0.5) * 0.8;
+            p.size = Math.random() * 18 + 15;
+            p.sway = Math.random() * 0.05;
+            p.swayOff = Math.random() * Math.PI * 2;
+            return p;
+        }
+        
+        updateAndDraw() {
+            for (const p of this.particles) {
+                p.y += p.vy;
+                p.swayOff += p.sway;
+                p.x += p.vx + Math.sin(p.swayOff) * 0.4;
+                p.rot += p.rotSpeed;
+                
+                if (p.y > this.h + 50) this.reset(p);
+                
+                this.ctx.save();
+                this.ctx.translate(p.x, p.y);
+                this.ctx.rotate(p.rot * Math.PI / 180);
+                this.ctx.globalAlpha = 0.9;
+                
+                if (this.img.complete) {
+                    this.ctx.drawImage(this.img, -p.size/2, -p.size/2, p.size, p.size);
+                }
+                
+                this.ctx.restore();
+            }
+        }
+    }
+
+    class SparkleSystem extends ParticleSystem {
+        constructor(target) {
+            super(target);
+            this.img = new Image();
+            this.img.src = SPARKLE_SVG;
+            this.start();
+        }
+        
+        initParticles() {
+            for (let i = 0; i < 40; i++) {
+                this.particles.push(this.reset({}));
+            }
+        }
+        
+        reset(p) {
+            p.x = Math.random() * this.w;
+            p.y = Math.random() * this.h;
+            p.phase = Math.random() * Math.PI * 2;
+            p.phaseSpeed = 0.03 + Math.random() * 0.03;
+            p.size = Math.random() * 25 + 20;
+            p.floatSpeed = (Math.random() - 0.5) * 0.3;
+            p.lifetime = Math.random() * 200 + 150;
+            p.age = 0;
+            return p;
+        }
+        
+        updateAndDraw() {
+            for (const p of this.particles) {
+                p.age++;
+                p.phase += p.phaseSpeed;
+                p.y += p.floatSpeed;
+                
+                if (p.age > p.lifetime) this.reset(p);
+                
+                const twinkle = (Math.sin(p.phase) + 1) / 2;
+                const lifeFade = Math.min(p.age / 50, 1) * Math.min((p.lifetime - p.age) / 50, 1);
+                const alpha = twinkle * 0.7 * lifeFade;
+                
+                this.ctx.save();
+                this.ctx.translate(p.x, p.y);
+                this.ctx.globalAlpha = alpha;
+                
+                if (this.img.complete) {
+                    this.ctx.drawImage(this.img, -p.size/2, -p.size/2, p.size, p.size);
+                }
+                
+                this.ctx.restore();
+            }
+        }
+    }
+
+    async function fetchGameImage(id) {
+        try {
+            const response = await fetch(`https://www.kogama.com/games/play/${id}/`);
+            const html = await response.text();
+            const match = html.match(/options\.bootstrap\s*=\s*({.*?});/s);
+            if (!match) return "";
+            
+            const data = JSON.parse(match[1]);
+            return data.object?.images?.large || 
+                   Object.values(data.object?.images || {})[0] || "";
+        } catch (err) {
+            console.error('Failed to fetch game image:', err);
+            return "";
+        }
+    }
+
+    async function fetchImgurImage(id) {
+        for (const ext of ["png", "jpg", "gif", "jpeg"]) {
+            const url = `https://i.imgur.com/${id}.${ext}`;
+            try {
+                const response = await fetch(url, { method: "HEAD" });
+                if (response.ok) return url;
+            } catch {}
+        }
+        return "";
+    }
+
+    const activeSystems = [];
+
+    async function applyEffects() {
+        try {
+            // Clean up existing systems
+            activeSystems.forEach(sys => sys.destroy?.());
+            activeSystems.length = 0;
+            
+            // Get description from bootstrap
+            const description = await waitForBootstrap();
+            
+            if (!description) {
+                console.log('Background Effects: No description found in bootstrap');
+                return;
+            }
+            
+            // Parse background syntax: Background: i-abc123 or Background: 123456
+            // Optional filter: filter: rain, snow, blur, dark
+            const match = /Background:\s*(?:i-([a-zA-Z0-9]+)|(\d+))(?:,\s*filter:\s*([a-z, ]+))?/i.exec(description);
+            
+            if (!match) {
+                console.log('Background Effects: No background syntax found');
+                return;
+            }
+            
+            const imgurId = match[1];
+            const gameId = match[2];
+            const imageUrl = imgurId 
+                ? await fetchImgurImage(imgurId) 
+                : await fetchGameImage(gameId);
+            
+            if (!imageUrl) {
+                console.warn('Background Effects: No image URL found');
+                return;
+            }
+            
+            const bgElement = document.querySelector("._33DXe");
+            if (!bgElement) {
+                console.warn('Background Effects: Background element not found');
+                return;
+            }
+            
+            // Parse filters and modifiers
+            const filters = match[3] ? match[3].split(",").map(f => f.trim().toLowerCase()) : [];
+            
+            const hasBlur = filters.includes('blur');
+            const hasDark = filters.includes('dark');
+            
+            // Build CSS filters
+            let cssFilters = [];
+            if (hasBlur) cssFilters.push('blur(4px)');
+            if (hasDark) cssFilters.push('brightness(0.7)');
+            
+            // Apply background with filters
+            Object.assign(bgElement.style, {
+                transition: "opacity 0.3s ease-in",
+                opacity: "1",
+                backgroundImage: `url("${imageUrl}")`,
+                backgroundSize: "cover",
+                backgroundPosition: "center",
+                backgroundRepeat: "no-repeat",
+                position: "absolute",
+                filter: cssFilters.join(' ') || 'none',
+                zIndex: "1"
+            });
+            
+            // Apply particle effects
+            filters.forEach(filter => {
+                let system;
+                switch(filter) {
+                    case "rain":
+                        system = new RainSystem(bgElement);
+                        system.start();
+                        activeSystems.push(system);
+                        console.log('Background Effects: Rain applied');
+                        break;
+                    case "snow":
+                        system = new SnowSystem(bgElement);
+                        activeSystems.push(system);
+                        console.log('Background Effects: Snow applied');
+                        break;
+                    case "fireflies":
+                        system = new FireflySystem(bgElement);
+                        activeSystems.push(system);
+                        console.log('Background Effects: Fireflies applied');
+                        break;
+                    case "roses":
+                        system = new RoseSystem(bgElement);
+                        activeSystems.push(system);
+                        console.log('Background Effects: Roses applied');
+                        break;
+                    case "sparkles":
+                        system = new SparkleSystem(bgElement);
+                        activeSystems.push(system);
+                        console.log('Background Effects: Sparkles applied');
+                        break;
+                }
+            });
+            
+            console.log('Background Effects: Applied successfully', {
+                source: imgurId ? `imgur:${imgurId}` : `game:${gameId}`,
+                filters: filters.join(', ') || 'none'
+            });
+            
+        } catch (err) {
+            console.error('Background Effects: Failed to apply', err);
+        }
+    }
+
+    // Tooltip trigger for textarea
+    const inputObserver = new MutationObserver(() => {
+        const textarea = document.querySelector("textarea#description");
+        
+        if (textarea && !textarea._bgEffectsMonitored) {
+            textarea._bgEffectsMonitored = true;
+            
+            let debounceTimer;
+            textarea.addEventListener("input", (e) => {
+                clearTimeout(debounceTimer);
+                const value = e.target.value.toLowerCase();
+                
+                if (value.includes("filter:")) {
+                    debounceTimer = setTimeout(() => showTooltip(e.target), 300);
+                } else {
+                    removeTooltip();
+                }
+            });
+            
+            textarea.addEventListener("blur", () => {
+                setTimeout(removeTooltip, 200);
+            });
+            
+            textarea.addEventListener("focus", (e) => {
+                if (e.target.value.toLowerCase().includes("filter:")) {
+                    setTimeout(() => showTooltip(e.target), 300);
+                }
+            });
+        }
+    });
+
+    inputObserver.observe(document.body, { 
+        childList: true, 
+        subtree: true 
+    });
+
+    if (document.readyState === "loading") {
+        addEventListener("DOMContentLoaded", applyEffects);
+    } else {
+        applyEffects();
+    }
+
+})();
+
 // Find kogama app/window.kogama
 (() => {
     let capturedOptions = null;
@@ -2767,7 +3449,7 @@
   hookBootstrap();
   run();
 })();
-// Manage Feeds
+// Manage Feed
 (function() {
   'use strict';
   
@@ -3711,7 +4393,8 @@
   createCardButton();
 })();
 
-// Update Checker
+
+// Update Checker 
 (function() {
   'use strict';
   
@@ -3760,7 +4443,7 @@
         top: 24px;
         left: 50%;
         transform: translateX(-50%);
-        z-index: 999999;
+        z-index: 2147483647;
         padding: 18px 26px;
         background: linear-gradient(135deg, #0d1f1d 0%, #1a2f2d 50%, #0d1f1d 100%);
         backdrop-filter: blur(16px);
@@ -3998,10 +4681,21 @@
   }
 
   function showUpdateNotification(currentVersion, remoteVersion) {
+    console.log('Utilify Update Check: Showing notification for update to v' + remoteVersion);
     document.querySelectorAll('.update-notification').forEach(n => dismissNotification(n));
     
     const notification = document.createElement('div');
     notification.className = 'update-notification';
+    notification.style.cssText = `
+      position: fixed !important;
+      top: 24px !important;
+      left: 50% !important;
+      transform: translateX(-50%) !important;
+      z-index: 2147483647 !important;
+      display: flex !important;
+      visibility: visible !important;
+      opacity: 1 !important;
+    `;
     
     notification.innerHTML = `
       <button class="update-close" aria-label="Dismiss">×</button>
@@ -4023,12 +4717,27 @@
       </div>
     `;
     
-    document.body.appendChild(notification);
+
+    if (!document.body) {
+ //     console.error('Utilify Update Check: document.body does not exist yet!');
+      setTimeout(() => showUpdateNotification(currentVersion, remoteVersion), 100);
+      return;
+    }
     
+    document.body.appendChild(notification);
+ //   console.log('Utilify Update Check: Notification element appended to body', notification);
+    setTimeout(() => {
+      const check = document.querySelector('.update-notification');
+      if (check) {
+    //    console.log('Utilify Update Check: Notification confirmed in DOM');
+      } else {
+   //     console.error('Utilify Update Check: Notification NOT found in DOM!');
+      }
+    }, 100);
+
     notification.querySelector('.update-close').addEventListener('click', () => {
       dismissNotification(notification);
     });
-    
     notification.querySelector('#update-dismiss').addEventListener('click', () => {
       dismissNotification(notification);
     });
@@ -4063,35 +4772,35 @@
   
   async function checkForUpdates(force = false) {
     if (!force && !shouldCheckForUpdates()) {
-      console.log('Utilify Update Check: Skipped (checked recently)');
+ //     console.log('Utilify Update Check: Skipped (checked recently)');
       return;
     }
     
-    console.log('Utilify Update Check: Starting...');
+//    console.log('Utilify Update Check: Starting...');
     
     const currentVersion = getInstalledVersion();
     if (!currentVersion) {
-      console.log('Utilify Update Check: Cannot determine installed version');
+ //     console.log('Utilify Update Check: Cannot determine installed version');
       return;
     }
     
     const remoteVersion = await fetchRemoteVersion();
     if (!remoteVersion) {
-      console.log('Utilify Update Check: Failed to fetch remote version');
+ //     console.log('Utilify Update Check: Failed to fetch remote version');
       return;
     }
     
-    console.log(`Utilify Update Check: Current v${currentVersion}, Remote v${remoteVersion}`);
+//    console.log(`Utilify Update Check: Current v${currentVersion}, Remote v${remoteVersion}`);
     
     const comparison = compareVersions(currentVersion, remoteVersion);
     
     if (comparison > 0) {
-      console.log('Utilify Update Check: Update available!');
+//      console.log('Utilify Update Check: Update available!');
       showUpdateNotification(currentVersion, remoteVersion);
     } else if (comparison === 0) {
-      console.log('Utilify Update Check: Up to date ✓');
+ //     console.log('Utilify Update Check: Up to date ✓');
     } else {
-      console.log('Utilify Update Check: Local version is newer (dev build?)');
+  //    console.log('Utilify Update Check: Local version is newer (dev build?)');
     }
     
     updateLastCheckTime();
@@ -4102,7 +4811,13 @@
     check: () => checkForUpdates(true),
     getVersion: getInstalledVersion,
     checkUrl: UPDATE_CHECK_URL,
-    installUrl: INSTALL_URL
+    installUrl: INSTALL_URL,
+    testNotification: () => {
+      const currentVer = getInstalledVersion() || '2.0.0';
+      const testVer = '2.1.0';
+ //     console.log('Utilify Update Check: Testing notification display...');
+      showUpdateNotification(currentVer, testVer);
+    }
   };
 
   function init() {
@@ -4116,3 +4831,4 @@
     init();
   }
 })();
+
