@@ -1,0 +1,4118 @@
+// ==UserScript==
+// @name         UtilifyV2
+// @namespace    wee woo wee woo
+// @version      2.3.1
+// @description  A rewrite of previous niche adaptation with goal to enhance visuals & experience
+// @author       Simon
+// @match        *://www.kogama.com/*
+// @icon         https://avatars.githubusercontent.com/u/143356794?v=4
+// @grant        GM_info
+// @grant        GM_addStyle
+// @grant        GM_getValue
+// @grant        GM_setValue
+// @grant        GM_xmlhttpRequest
+// @grant        GM_setClipboard
+// @connect      fonts.googleapis.com
+// @connect      kogama.com
+// @run-at       document-start
+// ==/UserScript==
+// CSS: Custom Layouts and improvements
+(() => {
+    const style = document.createElement("style");
+    style.textContent = `
+        .MuiCollapse-root.MuiCollapse-vertical._2Nols.MuiCollapse-entered.css-1cbf1l2 { display: none !important; } /* badge bullshit begone */
+        ._1Cwd5 { display: none !important; } /* streak bullshit begone */
+        ._1RMYS { display: none !important; } /* Footer begone */
+        ._4OXDk { display: none !important; } /* level display begone */
+        ._13UrL ._23KvS ._1z4jM ._4OXDk { width: 80px !important; } /* level to the left */
+        ._13UrL ._1F5Kt .CgH1- { justify-content: left !important; } /* creations, avatars */
+        ._13UrL ._23KvS ._1z4jM ._1aUa_ { max-height: 130px !important; max-width: 600px !important; } /* bio fix */
+        ._13UrL ._23KvS ._25Vmr ._2IqY6 ._2O_AH { margin-top: 13px !important; } /* rank etc, fix the gap */
+        ._1q4mD ._1sUGu ._1u05O { background-color: transparent !important; } /* navbar fix */
+        .css-1hitfzb, .css-1q1eu9e { color: #4adeb7 !important; } /* Feed & comment author usernames + some button text idk*/
+        .css-1995t1d, .css-e5yc1l { background-color: transparent !important; } /* kill the annoying orange badges */
+        ._2hUvr ._1T9vj, ._3-qgq ._2uIZL { background-color:hsla(0, 0%, 0%, 0.6) !important; backdrop-filter: blur(5px) !important; } /* titles on avatar cards */
+    
+    `;
+    document.documentElement.appendChild(style);
+})();
+
+// Find kogama app/window.kogama
+(() => {
+    let capturedOptions = null;
+    
+    Object.defineProperty(window, 'kogamaApp', {
+        set: function(fn) {
+            this._kogamaApp = function(options) {
+                // console.log("[Gradient DBG] kogamaApp called, capturing options");
+                capturedOptions = options;
+                window.__capturedBootstrap = options.bootstrap;
+                return fn(options);
+            };
+        },
+        get: function() {
+            return this._kogamaApp;
+        }
+    });
+})();
+// personalized profile griadents via description 
+(async () => {
+  "use strict";
+    // now reading from options.bootstrap to save time and future-proof         
+  const waitForBootstrap = () => new Promise(resolve => {
+    const check = () => {
+      const desc = window.__capturedBootstrap?.object?.description || 
+                   window.__capturedBootstrap?.current_user?.description;
+      
+      if (desc) {
+        resolve(desc);
+      } else {
+        requestAnimationFrame(check);
+      }
+    };
+    check();
+  });
+
+  const waitForElement = selector => new Promise(resolve => {
+    const check = () => {
+      const el = document.querySelector(selector);
+      if (el) {
+        resolve(el);
+      } else {
+        requestAnimationFrame(check);
+      }
+    };
+    check();
+  });
+
+  const description = await waitForBootstrap(); 
+  
+
+  const gradientMatch = /linear-gradient\((?:\d+deg, )?(#[0-9a-f]{6}, #[0-9a-f]{6}(?: \d+%)?)\)/i.exec(description);
+  
+  if (gradientMatch) {
+    const rootEl = await waitForElement('#root-page-mobile');
+    
+    if (rootEl) {
+      rootEl.style.transition = 'opacity 0.5s ease, background-image 1.3s ease-in';
+      rootEl.style.opacity = '0';
+      
+      requestAnimationFrame(() => {
+        rootEl.style.backgroundImage = gradientMatch[0];
+        rootEl.style.opacity = '1';
+      });
+    }
+  }
+})();
+
+
+// decode html by force for inputs (easy bio editing)
+(function() {
+    'use strict';
+    const decodeAllHtmlEntities = (text) => {
+        if (!text || typeof text !== 'string') return text;
+
+        const textarea = document.createElement('textarea');
+        textarea.innerHTML = text;
+        let decoded = textarea.value;
+
+        let previousDecoded = '';
+        let iterations = 0;
+        const maxIterations = 10;
+
+        while (decoded !== previousDecoded && iterations < maxIterations) {
+            previousDecoded = decoded;
+            textarea.innerHTML = decoded;
+            decoded = textarea.value;
+            iterations++;
+        }
+
+        return decoded;
+    };
+    const attachedListeners = new WeakSet();
+    const getReactProps = (element) => {
+        for (let key in element) {
+            if (key.startsWith('__reactProps$') || key.startsWith('__reactInternalInstance$')) {
+                return element[key];
+            }
+        }
+        return null;
+    };
+
+    const setReactValue = (element, value) => {
+        const previousValue = element.value;
+        const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+            element.tagName === 'TEXTAREA' ? window.HTMLTextAreaElement.prototype : window.HTMLInputElement.prototype,
+            'value'
+        )?.set;
+        
+        if (nativeInputValueSetter) {
+            nativeInputValueSetter.call(element, value);
+        }
+        element.value = value;
+        const reactProps = getReactProps(element);
+        if (reactProps && reactProps.onChange) {
+            const event = new Event('input', { bubbles: true });
+            Object.defineProperty(event, 'target', { writable: false, value: element });
+            reactProps.onChange(event);
+        }
+        ['input', 'change'].forEach(eventType => {
+            const event = new Event(eventType, { bubbles: true });
+            element.dispatchEvent(event);
+        });
+        element._valueTracker?.setValue(previousValue);
+        // console.log('[HTML Decoder] Updated:', previousValue, '→', value);
+    };
+    const processInput = (element, immediate = false) => {
+        if (!element || !element.value) return;
+        const decoded = decodeAllHtmlEntities(element.value);
+        if (decoded !== element.value) {
+            if (immediate) {
+                setReactValue(element, decoded);
+            } else {
+                requestAnimationFrame(() => setReactValue(element, decoded));
+            }
+        }
+    };
+    const attachListeners = (element) => {
+        if (attachedListeners.has(element)) return;
+        attachedListeners.add(element);
+        element.addEventListener('focus', () => {
+            processInput(element, true);
+        });
+        element.addEventListener('click', () => {
+            processInput(element, true);
+        });
+        element.addEventListener('input', (e) => {
+            setTimeout(() => processInput(element, true), 0);
+        });
+        element.addEventListener('blur', () => {
+            processInput(element, true);
+        });
+        processInput(element, false);
+    };
+    const scanForInputs = () => {
+        document.querySelectorAll('input, textarea').forEach(attachListeners);
+    };
+
+    const observer = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+            mutation.addedNodes.forEach((node) => {
+                if (node.nodeType === 1) {
+                    if (node.matches && node.matches('input, textarea')) {
+                        attachListeners(node);
+                    }
+                    node.querySelectorAll?.('input, textarea').forEach(attachListeners);
+                }
+            });
+        });
+    });
+    if (document.body) {
+        observer.observe(document.body, { childList: true, subtree: true });
+        scanForInputs();
+    } else {
+        document.addEventListener('DOMContentLoaded', () => {
+            observer.observe(document.body, { childList: true, subtree: true });
+            scanForInputs();
+        });
+    }
+    setInterval(scanForInputs, 2000);
+
+  //  console.log('[HTML Decoder] React  loaded');
+})();
+
+
+// config and settings long bullshit basically
+(function() {
+    'use strict';
+
+    const CONFIG = {
+      PANEL_ID: 'utilify_panel',
+      STYLE_ID: 'utilify_style',
+      STORAGE_KEY: 'UtilifyConfig',
+      PLUGINS_KEY: 'UtilifyPlugins',
+      UPDATE_URL: 'https://raw.githubusercontent.com/gxthickitty/Utilify/main/Script/Rewrite/Utilify.user.js',
+      
+      defaults: {
+        gradient: null,
+        gradientAngle: 135,
+        gradientColor1: '#0a2e2a',
+        gradientColor2: '#1a4d47',
+        fontFamily: null,
+        onlineFont: null,
+        glassPanels: { enabled: true, radius: 6, hue: 170, alpha: 0.18 },
+        onlineStyles: '',
+        customCSS: '',
+        disableFriendslist: false,
+        blurSensitive: false,
+        blurComments: false,
+        appearOffline: false,
+        friendActivity: false,
+        playerTypeDisplay: false,
+        lazyStreakKeeper: false,
+        plugins: []
+      }
+    };
+
+    const Storage = {
+      get(key, fallback) {
+        try {
+          if (typeof GM_getValue === 'function') return GM_getValue(key, fallback);
+          const raw = localStorage.getItem(key);
+          return raw ? JSON.parse(raw) : fallback;
+        } catch {
+          return fallback;
+        }
+      },
+      
+      set(key, value) {
+        try {
+          if (typeof GM_setValue === 'function') return GM_setValue(key, value);
+          localStorage.setItem(key, JSON.stringify(value));
+        } catch {}
+      },
+      
+      getConfig() {
+        return { ...CONFIG.defaults, ...this.get(CONFIG.STORAGE_KEY, {}) };
+      },
+      
+      saveConfig(cfg) {
+        this.set(CONFIG.STORAGE_KEY, cfg);
+      },
+
+      getPlugins() {
+        return this.get(CONFIG.PLUGINS_KEY, []);
+      },
+
+      savePlugins(plugins) {
+        this.set(CONFIG.PLUGINS_KEY, plugins);
+      }
+    };
+
+    function getProfileIdFromBootstrap() {
+      const scripts = document.querySelectorAll('script');
+      for (let script of scripts) {
+        if (!script.textContent) continue;
+        if (script.textContent.includes('options.bootstrap')) {
+          try {
+            const match = /options\.bootstrap\s*=\s*({[\s\S]*?});/.exec(script.textContent);
+            if (match && match[1]) {
+              const options = eval(`(${match[1]})`);
+              if (options.current_user?.id) return options.current_user.id;
+              if (options.object?.id) return options.object.id;
+            }
+          } catch {}
+        }
+      }
+      return null;
+    }
+  
+    function debounce(fn, ms) {
+      let timer;
+      return function(...args) {
+        clearTimeout(timer);
+        timer = setTimeout(() => fn.apply(this, args), ms);
+      };
+    }
+  
+    const Styles = {
+      inject(id, css) {
+        let el = document.getElementById(id);
+        if (!el) {
+          el = document.createElement('style');
+          el.id = id;
+          document.head.appendChild(el);
+        }
+        el.textContent = css;
+        return el;
+      },
+      
+      initBase() {
+        this.inject(CONFIG.STYLE_ID, `
+          @keyframes shimmer {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+          }
+
+          @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-3px); }
+          }
+
+          @keyframes glow-pulse {
+            0%, 100% { opacity: 0.6; }
+            50% { opacity: 1; }
+          }
+
+          #${CONFIG.PANEL_ID} {
+            position: fixed;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            width: min(780px, 94vw);
+            max-height: 72vh;
+            border-radius: 12px;
+            overflow: hidden;
+            background: linear-gradient(135deg, #0d1f1d 0%, #1a2f2d 50%, #0d1f1d 100%);
+            color: #e0f0ee;
+            box-shadow: 
+              0 0 40px rgba(74, 222, 183, 0.2),
+              0 20px 80px rgba(0, 0, 0, 0.7),
+              inset 0 1px 0 rgba(74, 222, 183, 0.15);
+            z-index: 120000;
+            display: none;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            border: 1px solid rgba(74, 222, 183, 0.25);
+            transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1), 
+                        transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            opacity: 0;
+            backdrop-filter: blur(20px);
+          }
+          
+          #${CONFIG.PANEL_ID}.visible {
+            display: flex;
+            flex-direction: column;
+            opacity: 1;
+          }
+
+          /* Subtle tech accent on corners */
+          #${CONFIG.PANEL_ID}::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 180px;
+            height: 180px;
+            background: radial-gradient(circle at top right, rgba(74, 222, 183, 0.15) 0%, transparent 60%);
+            border-radius: 0 12px 0 0;
+            pointer-events: none;
+          }
+
+          #${CONFIG.PANEL_ID}::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 180px;
+            height: 180px;
+            background: radial-gradient(circle at bottom left, rgba(42, 157, 143, 0.1) 0%, transparent 60%);
+            pointer-events: none;
+          }
+
+          #${CONFIG.PANEL_ID} .header {
+            height: 64px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 0 28px;
+            cursor: grab;
+            user-select: none;
+            background: linear-gradient(135deg, rgba(20, 35, 33, 0.85) 0%, rgba(15, 28, 26, 0.95) 100%);
+            border-bottom: 1px solid rgba(74, 222, 183, 0.12);
+            position: relative;
+          }
+
+          #${CONFIG.PANEL_ID} .header::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 5%;
+            right: 5%;
+            height: 1px;
+            background: linear-gradient(90deg, 
+              transparent 0%, 
+              rgba(74, 222, 183, 0.4) 50%, 
+              transparent 100%);
+          }
+
+          #${CONFIG.PANEL_ID} .title {
+            font-weight: 500;
+            font-size: 11px;
+            letter-spacing: 3px;
+            color: rgba(74, 222, 183, 0.7);
+            text-transform: uppercase;
+            flex: 1;
+            text-align: center;
+            position: relative;
+          }
+          
+          #${CONFIG.PANEL_ID} .title::before,
+          #${CONFIG.PANEL_ID} .title::after {
+            content: '◆';
+            position: absolute;
+            color: rgba(74, 222, 183, 0.5);
+            font-size: 8px;
+          }
+          
+          #${CONFIG.PANEL_ID} .title::before {
+            left: -20px;
+          }
+          
+          #${CONFIG.PANEL_ID} .title::after {
+            right: -20px;
+          }
+
+          #${CONFIG.PANEL_ID} .close {
+            background: rgba(74, 222, 183, 0.08);
+            border: 1px solid rgba(74, 222, 183, 0.2);
+            color: #4adeb7;
+            cursor: pointer;
+            padding: 8px 14px;
+            border-radius: 8px;
+            font-size: 18px;
+            line-height: 1;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+          }
+          
+          #${CONFIG.PANEL_ID} .close:hover {
+            background: rgba(74, 222, 183, 0.15);
+            border-color: rgba(74, 222, 183, 0.4);
+            color: #6ef0cb;
+            transform: scale(1.05);
+          }
+
+          #${CONFIG.PANEL_ID} .body {
+            display: flex;
+            gap: 2px;
+            height: calc(72vh - 64px);
+            background: rgba(0, 0, 0, 0.25);
+            position: relative;
+          }
+
+          /* Made by Simon - vertical text */
+          #${CONFIG.PANEL_ID} .body::after {
+            content: 'Made by Simon';
+            position: absolute;
+            right: 14px;
+            bottom: 24px;
+            writing-mode: vertical-rl;
+            text-orientation: mixed;
+            font-size: 10px;
+            letter-spacing: 2.5px;
+            color: rgba(74, 222, 183, 0.35);
+            font-weight: 500;
+            text-transform: uppercase;
+            pointer-events: none;
+          }
+
+          #${CONFIG.PANEL_ID} .tabs {
+            width: 190px;
+            background: linear-gradient(180deg, rgba(15, 28, 26, 0.7) 0%, rgba(10, 20, 18, 0.85) 100%);
+            padding: 18px 14px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 7px;
+          }
+
+          #${CONFIG.PANEL_ID} .tab {
+            padding: 14px 18px;
+            cursor: pointer;
+            border-left: 2px solid transparent;
+            color: #a0c8c0;
+            border-radius: 8px;
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            font-size: 13px;
+            font-weight: 500;
+            position: relative;
+            overflow: hidden;
+          }
+
+          #${CONFIG.PANEL_ID} .tab::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, rgba(74, 222, 183, 0.08) 0%, rgba(42, 157, 143, 0.05) 100%);
+            opacity: 0;
+            transition: opacity 0.25s ease;
+          }
+
+          #${CONFIG.PANEL_ID} .tab:hover {
+            background: rgba(74, 222, 183, 0.05);
+            color: #c0e8dd;
+            transform: translateX(4px);
+          }
+
+          #${CONFIG.PANEL_ID} .tab:hover::before {
+            opacity: 1;
+          }
+
+          #${CONFIG.PANEL_ID} .tab.active {
+            background: linear-gradient(135deg, rgba(74, 222, 183, 0.12) 0%, rgba(42, 157, 143, 0.08) 100%);
+            border-left-color: #4adeb7;
+            color: #4adeb7;
+            transform: translateX(5px);
+            box-shadow: 0 3px 10px rgba(74, 222, 183, 0.15);
+            position: relative;
+          }
+
+          #${CONFIG.PANEL_ID} .tab.active::after {
+            content: '◆';
+            position: absolute;
+            right: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: rgba(74, 222, 183, 0.7);
+            font-size: 10px;
+          }
+
+          #${CONFIG.PANEL_ID} .tab.active::before {
+            opacity: 1;
+          }
+
+          #${CONFIG.PANEL_ID} .content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 26px;
+            background: linear-gradient(180deg, rgba(13, 23, 21, 0.95) 0%, rgba(10, 18, 16, 0.98) 100%);
+            position: relative;
+          }
+
+          .field-row {
+            margin: 18px 0;
+            display: flex;
+            gap: 14px;
+            align-items: center;
+          }
+
+          .field-label {
+            font-size: 13px;
+            color: #b8d8d0;
+            min-width: 120px;
+            font-weight: 500;
+          }
+
+          .color-input {
+            width: 56px;
+            height: 40px;
+            border: 2px solid rgba(74, 222, 183, 0.25);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            background: rgba(0, 0, 0, 0.4);
+          }
+          
+          .color-input:hover {
+            transform: scale(1.05);
+            border-color: rgba(74, 222, 183, 0.5);
+            box-shadow: 0 4px 16px rgba(74, 222, 183, 0.2);
+          }
+
+          input[type="text"], input[type="number"], select, textarea {
+            padding: 11px 15px;
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(74, 222, 183, 0.18);
+            border-radius: 8px;
+            color: #e0f0ee;
+            font-size: 13px;
+            transition: all 0.2s ease;
+          }
+
+          input[type="text"]:focus, input[type="number"]:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: rgba(74, 222, 183, 0.4);
+            box-shadow: 0 0 0 3px rgba(74, 222, 183, 0.1);
+          }
+
+          input[type="range"] {
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: linear-gradient(90deg, rgba(42, 157, 143, 0.3) 0%, rgba(74, 222, 183, 0.5) 100%);
+            outline: none;
+            -webkit-appearance: none;
+          }
+          
+          input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #4adeb7 0%, #2a9d8f 100%);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 8px rgba(74, 222, 183, 0.4);
+          }
+          
+          input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+            box-shadow: 0 4px 16px rgba(74, 222, 183, 0.6);
+          }
+
+          input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+            accent-color: #4adeb7;
+          }
+
+          .button {
+            padding: 11px 22px;
+            background: linear-gradient(135deg, rgba(74, 222, 183, 0.18) 0%, rgba(42, 157, 143, 0.12) 100%);
+            color: #4adeb7;
+            border-radius: 8px;
+            border: 1px solid rgba(74, 222, 183, 0.35);
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 13px;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+          }
+
+          .button::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.12);
+            transform: translate(-50%, -50%);
+            transition: width 0.3s ease, height 0.3s ease;
+          }
+
+          .button:hover::before {
+            width: 300px;
+            height: 300px;
+          }
+
+          .button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(74, 222, 183, 0.3);
+            border-color: rgba(74, 222, 183, 0.6);
+          }
+
+          .button:active {
+            transform: translateY(0);
+          }
+
+          .small-note {
+            font-size: 12px;
+            color: #8aa8a0;
+            margin-top: 10px;
+            line-height: 1.7;
+          }
+
+          label {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            cursor: pointer;
+            color: #b8d8d0;
+            font-size: 14px;
+            transition: color 0.2s ease;
+          }
+
+          label:hover {
+            color: #d0ede5;
+          }
+
+          /* Plugin list styles */
+          .plugin-item {
+            background: rgba(74, 222, 183, 0.05);
+            border: 1px solid rgba(74, 222, 183, 0.15);
+            border-radius: 8px;
+            padding: 14px;
+            margin-bottom: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+          }
+
+          .plugin-info h4 {
+            color: #4adeb7;
+            font-size: 14px;
+            margin: 0 0 4px 0;
+          }
+
+          .plugin-info p {
+            color: #8aa8a0;
+            font-size: 12px;
+            margin: 0;
+          }
+
+          .plugin-controls {
+            display: flex;
+            gap: 8px;
+          }
+
+          .plugin-toggle {
+            padding: 6px 12px;
+            font-size: 12px;
+          }
+
+          .plugin-remove {
+            background: rgba(239, 71, 111, 0.15);
+            border-color: rgba(239, 71, 111, 0.3);
+            color: #ef476f;
+            padding: 6px 12px;
+            font-size: 12px;
+          }
+
+          .plugin-remove:hover {
+            background: rgba(239, 71, 111, 0.25);
+            border-color: rgba(239, 71, 111, 0.5);
+          }
+
+          /* Scrollbars */
+          ::-webkit-scrollbar {
+            width: 10px;
+            height: 10px;
+          }
+          
+          ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.3);
+          }
+          
+          ::-webkit-scrollbar-thumb {
+            background: linear-gradient(180deg, rgba(74, 222, 183, 0.35) 0%, rgba(42, 157, 143, 0.35) 100%);
+            border-radius: 5px;
+            border: 2px solid transparent;
+            background-clip: padding-box;
+          }
+          
+          ::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(180deg, rgba(74, 222, 183, 0.55) 0%, rgba(42, 157, 143, 0.55) 100%);
+            background-clip: padding-box;
+          }
+
+          a {
+            color: #4adeb7;
+            text-decoration: none;
+            transition: color 0.2s ease;
+          }
+
+          a:hover {
+            color: #6ef0cb;
+            text-decoration: underline;
+          }
+        `);
+      },
+      
+      applyGradient(value, angle, c1, c2) {
+        const target = document.getElementById('root-page-mobile');
+        if (!target) {
+          // Fallback to body if new selector doesn't exist
+          document.body.style.backgroundImage = value || '';
+          document.body.style.backgroundAttachment = 'fixed';
+          return;
+        }
+        target.style.backgroundImage = value || '';
+        target.style.backgroundAttachment = 'fixed';
+      },
+      
+      applyPrivacy(cfg) {
+        let css = '';
+        if (cfg.disableFriendslist) css += `._1Yhgq{display:none!important}\n`;
+        if (cfg.blurSensitive) css += `._13UrL .kR267 ._9smi2 ._1rJI8 ._1aUa_{filter:blur(8px);transition:filter .25s ease}\n._13UrL .kR267 ._9smi2 ._1rJI8 ._1aUa_:hover{filter:blur(0)}\n._3zDi-{filter:blur(8px);transition:filter .25s ease}\n._3zDi-:hover{filter:blur(0)}\n._2O_AH{filter:blur(8px);transition:filter .25s ease}\n._2O_AH:hover{filter: blur(0)}\n._3hI0M{filter:blur(8px);transition:filter .25s ease}\n._3hI0M:hover{filter: blur(0)}\n._2IqY6{filter:blur(8px);transition:filter .25s ease}\n._2IqY6:hover{filter: blur(0)}\n.css-1hitfzb{filter:blur(8px);transition:filter .25s ease}\n.css-1hitfzb:hover{filter: blur(0)}`;
+        if (cfg.blurComments) css += `._3Wsxf{filter:blur(8px);transition:filter .25s ease}\n._3Wsxf:hover{filter:none}\n`;
+        this.inject('utilify_privacy', css);
+      },
+      
+      applyGlass(cfg) {
+        if (!cfg.glassPanels?.enabled) {
+          this.inject('utilify_glass', '');
+          return;
+        }
+        const { radius, hue, alpha } = cfg.glassPanels;
+        this.inject('utilify_glass', `
+          ._3TORb ._2E1AL .tRx6U, .css-1wbcikz, .css-wog98n, .css-o4yc28, .css-z05bui, ._1q4mD {
+            background-color: hsla(${hue},65%,40%,${alpha}) !important;
+            backdrop-filter: blur(8px) !important;
+            border-radius: ${radius}px !important;
+            transition: all 0.25s ease !important;
+          }
+          ._3TORb {
+            background-color: hsla(${hue},65%,40%,${alpha}) !important;
+            border-radius: ${radius}px !important;
+            transition: all 0.25s ease !important;            
+          }
+        `);
+      },
+      
+      applyCustomCSS(css) {
+        this.inject('utilify_custom', css || '');
+      },
+
+      loadOnlineCSS(urls) {
+        document.querySelectorAll('link[data-utilify-online]').forEach(el => el.remove());
+        if (!urls) return;
+        urls.split('\n').map(s => s.trim()).filter(Boolean).forEach(url => {
+          try {
+            const u = new URL(url);
+            const l = document.createElement('link');
+            l.rel = 'stylesheet';
+            l.href = u.href;
+            l.dataset.utilifyOnline = '1';
+            document.head.appendChild(l);
+          } catch {}
+        });
+      },
+
+      applyFont(fontName, fontUrl) {
+        document.querySelectorAll('link[data-utilify-font]').forEach(el => el.remove());
+        document.querySelectorAll('style[data-utilify-font-style]').forEach(el => el.remove());
+        
+        if (!fontName || !fontUrl) {
+          const st = document.createElement('style');
+          st.dataset.utilifyFontStyle = '1';
+          st.textContent = `* { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important; }`;
+          document.head.appendChild(st);
+          return;
+        }
+
+        const link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.href = fontUrl;
+        link.dataset.utilifyFont = '1';
+        document.head.appendChild(link);
+
+        const st = document.createElement('style');
+        st.dataset.utilifyFontStyle = '1';
+        st.textContent = `* { font-family: '${fontName}', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important; }`;
+        document.head.appendChild(st);
+      },
+
+      loadOnlineFont(url) {
+        if (!url) return;
+        try {
+          new URL(url);
+          const match = url.includes('fonts.googleapis.com') ? (url.match(/family=([^&:]+)/) || [])[1] : null;
+          const family = match ? match.replace(/\+/g, ' ') : 'CustomFont';
+          this.applyFont(family, url);
+        } catch {}
+      }
+    };
+
+    const PluginManager = {
+      loadedPlugins: new Map(),
+
+      async fetchPlugin(url) {
+        return new Promise((resolve, reject) => {
+          if (typeof GM_xmlhttpRequest === 'function') {
+            GM_xmlhttpRequest({
+              method: 'GET',
+              url: url,
+              onload: (response) => {
+                if (response.status === 200) {
+                  resolve(response.responseText);
+                } else {
+                  reject(new Error(`HTTP ${response.status}`));
+                }
+              },
+              onerror: () => reject(new Error('Network error'))
+            });
+          } else {
+            fetch(url)
+              .then(r => r.ok ? r.text() : Promise.reject(new Error(`HTTP ${r.status}`)))
+              .then(resolve)
+              .catch(reject);
+          }
+        });
+      },
+
+      async addPlugin(url) {
+        try {
+          const code = await this.fetchPlugin(url);
+          
+          // Extract metadata from code comments
+          const nameMatch = code.match(/@name\s+(.+)/);
+          const descMatch = code.match(/@description\s+(.+)/);
+          
+          const plugin = {
+            id: Date.now().toString(),
+            name: nameMatch ? nameMatch[1].trim() : 'Unnamed Plugin',
+            description: descMatch ? descMatch[1].trim() : 'No description',
+            url: url,
+            code: code,
+            enabled: true
+          };
+
+          const plugins = Storage.getPlugins();
+          plugins.push(plugin);
+          Storage.savePlugins(plugins);
+
+          this.enablePlugin(plugin);
+          return plugin;
+        } catch (error) {
+          throw new Error(`Failed to load plugin: ${error.message}`);
+        }
+      },
+
+      enablePlugin(plugin) {
+        if (this.loadedPlugins.has(plugin.id)) return;
+
+        try {
+          const script = document.createElement('script');
+          script.id = `utilify-plugin-${plugin.id}`;
+          script.textContent = plugin.code;
+          document.head.appendChild(script);
+          this.loadedPlugins.set(plugin.id, script);
+        } catch (error) {
+          console.error(`Failed to enable plugin ${plugin.name}:`, error);
+        }
+      },
+
+      disablePlugin(plugin) {
+        const script = this.loadedPlugins.get(plugin.id);
+        if (script) {
+          script.remove();
+          this.loadedPlugins.delete(plugin.id);
+        }
+      },
+
+      removePlugin(pluginId) {
+        const plugins = Storage.getPlugins();
+        const plugin = plugins.find(p => p.id === pluginId);
+        
+        if (plugin && plugin.enabled) {
+          this.disablePlugin(plugin);
+        }
+
+        const filtered = plugins.filter(p => p.id !== pluginId);
+        Storage.savePlugins(filtered);
+      },
+
+      togglePlugin(pluginId) {
+        const plugins = Storage.getPlugins();
+        const plugin = plugins.find(p => p.id === pluginId);
+        
+        if (!plugin) return;
+
+        plugin.enabled = !plugin.enabled;
+        Storage.savePlugins(plugins);
+
+        if (plugin.enabled) {
+          this.enablePlugin(plugin);
+        } else {
+          this.disablePlugin(plugin);
+        }
+      },
+
+      loadAllPlugins() {
+        const plugins = Storage.getPlugins();
+        plugins.forEach(plugin => {
+          if (plugin.enabled) {
+            this.enablePlugin(plugin);
+          }
+        });
+      }
+    };
+
+    const RiskyFeatures = {
+      pulseBlocker: { installed: false },
+      friendActivity: { timer: null, observer: null, profileId: null },
+      playerType: { attached: false, observer: null },
+      streakKeeper: { timer: null },
+
+      installPulseBlocker() {
+        if (this.pulseBlocker.installed) return;
+        
+        window.__utilify_orig_xhr_open = XMLHttpRequest.prototype.open;
+        window.__utilify_orig_xhr_send = XMLHttpRequest.prototype.send;
+        window.__utilify_orig_fetch = window.fetch;
+
+        XMLHttpRequest.prototype.open = function(method, url) {
+          this.__utilify_method = (method || '').toUpperCase();
+          this.__utilify_url = typeof url === 'string' ? url : null;
+          return window.__utilify_orig_xhr_open.apply(this, arguments);
+        };
+
+        XMLHttpRequest.prototype.send = function(body) {
+          try {
+            if (this.__utilify_method === 'POST' && this.__utilify_url) {
+              const u = new URL(this.__utilify_url, location.href);
+              if (/^\/user\/\d+\/pulse\/?$/.test(u.pathname)) {
+                this.abort && this.abort();
+                return;
+              }
+            }
+          } catch {}
+          return window.__utilify_orig_xhr_send.apply(this, arguments);
+        };
+
+        window.fetch = function(resource, init) {
+          try {
+            const method = (init?.method || 'GET').toUpperCase();
+            if (method === 'POST') {
+              const url = resource instanceof Request ? resource.url : resource;
+              const u = new URL(url, location.href);
+              if (/^\/user\/\d+\/pulse\/?$/.test(u.pathname)) {
+                return Promise.resolve(new Response(null, { status: 204 }));
+              }
+            }
+          } catch {}
+          return window.__utilify_orig_fetch.apply(this, arguments);
+        };
+
+        this.pulseBlocker.installed = true;
+      },
+
+      uninstallPulseBlocker() {
+        if (!this.pulseBlocker.installed) return;
+        if (window.__utilify_orig_xhr_open) XMLHttpRequest.prototype.open = window.__utilify_orig_xhr_open;
+        if (window.__utilify_orig_xhr_send) XMLHttpRequest.prototype.send = window.__utilify_orig_xhr_send;
+        if (window.__utilify_orig_fetch) window.fetch = window.__utilify_orig_fetch;
+        this.pulseBlocker.installed = false;
+      },
+
+      cache: { games: {}, projects: {} },
+
+      async fetchGameTitle(gid) {
+        if (this.cache.games[gid]) return this.cache.games[gid];
+        try {
+          const res = await fetch(`https://www.kogama.com/games/play/${gid}/`);
+          const html = await res.text();
+          const doc = new DOMParser().parseFromString(html, 'text/html');
+          const title = doc.querySelector('title')?.textContent.split(' - KoGaMa')[0]?.trim() || null;
+          if (title) this.cache.games[gid] = title;
+          return title;
+        } catch { return null; }
+      },
+
+      async fetchProjectName(pid) {
+        if (this.cache.projects[pid]) return this.cache.projects[pid];
+        try {
+          const res = await fetch(`https://www.kogama.com/game/${pid}/member`);
+          if (!res.ok) return null;
+          const data = await res.json();
+          if (data.data?.length) {
+            const name = data.data[0].name;
+            this.cache.projects[pid] = name;
+            return name;
+          }
+        } catch {}
+        return null;
+      },
+
+      updateFriendStatus(name, text) {
+        document.querySelectorAll('._1taAL').forEach(el => {
+          const nameEl = el.querySelector('._3zDi-');
+          const statusEl = el.querySelector('._40qZj');
+          if (nameEl?.textContent?.trim() === name && statusEl) {
+            statusEl.textContent = text;
+          }
+        });
+      },
+
+      async fetchFriendChat() {
+        if (!this.friendActivity.profileId) return;
+        try {
+          const res = await fetch(`https://www.kogama.com/user/${this.friendActivity.profileId}/friend/chat/`);
+          if (!res.ok) return;
+          const data = await res.json();
+          
+          if (data.data && Array.isArray(data.data)) {
+            data.data.forEach(friend => {
+              const username = friend.username;
+              const loc = friend.location || '/';
+              
+              const gameMatch = loc.match(/\/games\/play\/(\d+)\//);
+              if (gameMatch) {
+                this.fetchGameTitle(gameMatch[1]).then(title => {
+                  if (title) this.updateFriendStatus(username, title);
+                });
+              }
+
+              const projectMatch = loc.match(/\/build\/\d+\/project\/(\d+)\//) || loc.match(/\/game\/(\d+)\/member/);
+              if (projectMatch) {
+                this.fetchProjectName(projectMatch[1]).then(nameText => {
+                  if (nameText) this.updateFriendStatus(username, nameText);
+                });
+              }
+            });
+          }
+        } catch (err) {
+          console.error('Utilify Friend Fetch Error:', err);
+        }
+      },
+
+      processFriendEntry(entry) {
+        const nameEl = entry.querySelector('._3zDi-');
+        if (!nameEl) return;
+        const name = nameEl.textContent?.trim();
+        
+        const statusEl = entry.querySelector('._40qZj');
+        const loc = statusEl?.textContent?.trim() || entry.querySelector('a[href]')?.getAttribute('href');
+        
+        if (!loc) return;
+
+        const gameMatch = loc.match(/\/games\/play\/(\d+)\//);
+        if (gameMatch) {
+          this.fetchGameTitle(gameMatch[1]).then(title => {
+            if (title) this.updateFriendStatus(name, title);
+          });
+          return;
+        }
+
+        const projectMatch = loc.match(/\/build\/\d+\/project\/(\d+)\//) || loc.match(/\/game\/(\d+)\/member/);
+        if (projectMatch) {
+          this.fetchProjectName(projectMatch[1]).then(name => {
+            if (name) this.updateFriendStatus(name, name);
+          });
+        }
+      },
+
+      enableFriendActivity() {
+        if (this.friendActivity.observer || this.friendActivity.timer) return;
+        
+        const profileId = getProfileIdFromBootstrap();
+        if (!profileId) return;
+
+        this.friendActivity.profileId = profileId;
+        this.fetchFriendChat();
+
+        this.friendActivity.timer = setInterval(() => {
+          this.fetchFriendChat();
+        }, 30000);
+
+        const scanList = (container) => {
+          container?.querySelectorAll('._1lvYU, ._1taAL').forEach(node => 
+            this.processFriendEntry(node)
+          );
+        };
+
+        const containers = ['._1Yhgq', '._3Wytz', 'div[role="list"]'];
+        let target = null;
+        for (const sel of containers) {
+          target = document.querySelector(sel);
+          if (target) break;
+        }
+
+        if (target) {
+          scanList(target);
+          const mo = new MutationObserver((mutations) => {
+            for (const m of mutations) {
+              m.addedNodes.forEach(node => {
+                if (node.nodeType === 1 && (node.matches?._1lvYU || node.querySelector?._1lvYU)) {
+                  this.processFriendEntry(node);
+                }
+              });
+            }
+          });
+          mo.observe(target, { childList: true, subtree: true });
+          this.friendActivity.observer = mo;
+        }
+      },
+
+      disableFriendActivity() {
+        if (this.friendActivity.observer) {
+          this.friendActivity.observer.disconnect();
+          this.friendActivity.observer = null;
+        }
+        if (this.friendActivity.timer) {
+          clearInterval(this.friendActivity.timer);
+          this.friendActivity.timer = null;
+        }
+      },
+
+      async renderPlayerChip(el) {
+        if (!el) return;
+        try {
+          const res = await fetch(location.href);
+          const html = await res.text();
+          const m = html.match(/playing_now_members["']\s*:\s*(\d+).*?playing_now_tourists["']\s*:\s*(\d+)/s);
+          const counts = m ? { members: +m[1], tourists: +m[2] } : { members: 0, tourists: 0 };
+          
+          el.innerHTML = '';
+          el.style.cssText = `
+            background: linear-gradient(135deg, rgba(74, 222, 183, 0.15), rgba(42, 157, 143, 0.1));
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(74, 222, 183, 0.25);
+            border-radius: 10px;
+            padding: 9px 18px;
+            display: inline-flex;
+            align-items: center;
+            gap: 14px;
+            color: #e0f0ee;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+            font-size: 13px;
+          `;
+
+          const total = counts.members + counts.tourists;
+          el.innerHTML = `
+            <span style="font-weight:600; color:#4adeb7;">Global: ${total}</span>
+            <span style="color:#6ef0cb;">Players: ${counts.members}</span>
+            <span style="color:#a0c8c0;">Tourists: ${counts.tourists}</span>
+          `;
+        } catch {}
+      },
+
+      enablePlayerTypeDisplay() {
+        if (!location.pathname.includes('/games/play/')) return;
+        if (this.playerType.attached) return;
+
+        const selectors = ['.MuiChip-colorPrimary', '.PlayerCountChip', '[data-player-chip]'];
+        const findAndRender = () => {
+          for (const sel of selectors) {
+            const chip = document.querySelector(sel);
+            if (chip) {
+              this.renderPlayerChip(chip);
+              this.playerType.attached = true;
+              return true;
+            }
+          }
+          return false;
+        };
+
+        if (findAndRender()) return;
+
+        const mo = new MutationObserver(() => {
+          if (findAndRender()) mo.disconnect();
+        });
+        mo.observe(document.body, { childList: true, subtree: true });
+        this.playerType.observer = mo;
+      },
+
+      disablePlayerTypeDisplay() {
+        if (this.playerType.observer) {
+          this.playerType.observer.disconnect();
+          this.playerType.observer = null;
+        }
+        this.playerType.attached = false;
+      },
+
+      enableStreakKeeper() {
+        if (this.streakKeeper.timer) return;
+
+        const userId = getProfileIdFromBootstrap();
+        if (!userId) return;
+
+        const TARGET = 670350173;
+        const INTERVAL = 7 * 60 * 60 * 1000;
+        const POLL_INTERVAL = 60 * 1000;
+        const INITIAL_HISTORY_DELAY_MS = 1000;
+        const HISTORY_RETRY_DELAY_MS = 10 * 1000;
+        const RESPONSE_WAIT_MS = 3 * 60 * 1000;
+        const SECOND_RESPONSE_WAIT_MS = 60 * 1000;
+
+        const MESSAGES = [
+          "you are so loved <3",
+          "streak check in, hi!",
+          "keeping the streak alive <3",
+          "quick hello from your streak bot"
+        ];
+
+        const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+        const postChat = async message => {
+          await fetch(`https://www.kogama.com/chat/${userId}/`, {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ to_profile_id: TARGET, message })
+          });
+        };
+
+        const fetchHistory = async () => {
+          const r = await fetch(
+            `https://www.kogama.com/chat/${userId}/history/${TARGET}/`,
+            { credentials: 'include' }
+          );
+          return r.json().catch(() => null);
+        };
+
+        const waitForReply = async timeoutMs => {
+          const start = Date.now();
+          await sleep(INITIAL_HISTORY_DELAY_MS);
+
+          while (Date.now() - start < timeoutMs) {
+            try {
+              const h = await fetchHistory();
+              if (h && Array.isArray(h.data) && h.data[0]?.from_profile_id == TARGET) {
+                return h.data[0];
+              }
+            } catch {}
+            await sleep(HISTORY_RETRY_DELAY_MS);
+          }
+          return null;
+        };
+
+        const sendMessage = async () => {
+          const lastSent = parseInt(localStorage.getItem('ls_last_sent') || '0');
+          if (Date.now() - lastSent < INTERVAL) return;
+
+          try {
+            const msg1 = MESSAGES[Math.floor(Math.random() * MESSAGES.length)];
+            await postChat(msg1);
+            localStorage.setItem('ls_last_sent', Date.now().toString());
+
+            const reply1 = await waitForReply(RESPONSE_WAIT_MS);
+            if (!reply1) return;
+
+            const msg2 = MESSAGES[Math.floor(Math.random() * MESSAGES.length)];
+            await postChat(msg2);
+
+            const reply2 = await waitForReply(SECOND_RESPONSE_WAIT_MS);
+            if (!reply2) return;
+
+            const msg3 = MESSAGES[Math.floor(Math.random() * MESSAGES.length)];
+            await postChat(msg3);
+          } catch {}
+        };
+
+        sendMessage();
+        this.streakKeeper.timer = setInterval(sendMessage, POLL_INTERVAL);
+      },
+
+      disableStreakKeeper() {
+        if (this.streakKeeper.timer) {
+          clearInterval(this.streakKeeper.timer);
+          this.streakKeeper.timer = null;
+        }
+      }
+    };
+
+    const UI = {
+      panel: null,
+      
+      create() {
+        if (this.panel) return this.panel;
+        
+        this.panel = document.createElement('div');
+        this.panel.id = CONFIG.PANEL_ID;
+        this.panel.innerHTML = `
+          <div class="header">
+            <div class="title">Utilify V2</div>
+            <button class="close" aria-label="Close">×</button>
+          </div>
+          <div class="body">
+            <div class="tabs">
+              <div class="tab active" data-tab="gradient">Gradient</div>
+              <div class="tab" data-tab="privacy">Privacy</div>
+              <div class="tab" data-tab="styles">Styles</div>
+              <div class="tab" data-tab="fonts">Fonts</div>
+              <div class="tab" data-tab="plugins">Plugins</div>
+              <div class="tab" data-tab="risky">UAOR</div>
+              <div class="tab" data-tab="about">About</div>
+            </div>
+            <div class="content">
+              ${this.renderTabs()}
+            </div>
+          </div>
+        `;
+        
+        document.body.appendChild(this.panel);
+        this.setupEvents();
+        this.enableDrag();
+        return this.panel;
+      },
+      
+      renderTabs() {
+        return `
+          <div class="tab-content" id="tab-gradient">
+            <div class="field-row">
+              <span class="field-label">Angle</span>
+              <input id="gradient-angle" type="range" min="0" max="360" value="135" style="flex:1"/>
+              <span id="angle-val" style="min-width:40px; text-align:right; color:#4adeb7;">135°</span>
+            </div>
+            <div class="field-row">
+              <span class="field-label">Color 1</span>
+              <input id="color1" class="color-input" type="color" value="#0a2e2a"/>
+              <input id="color1hex" type="text" placeholder="#HEX" style="flex:1"/>
+            </div>
+            <div class="field-row">
+              <span class="field-label">Color 2</span>
+              <input id="color2" class="color-input" type="color" value="#1a4d47"/>
+              <input id="color2hex" type="text" placeholder="#HEX" style="flex:1"/>
+            </div>
+            <div class="field-row">
+              <span class="field-label">Gradient CSS</span>
+              <input id="gradient-input" type="text" placeholder="linear-gradient(...)" style="flex:1"/>
+            </div>
+            <div class="field-row" style="margin-top:20px;">
+              <button id="gradient-apply" class="button">Apply</button>
+              <button id="gradient-copy" class="button">Copy CSS</button>
+              <button id="gradient-clear" class="button">Clear</button>
+            </div>
+            <div class="small-note" style="margin-top:12px;">
+              Changes apply live. Targets: #root-page-mobile (new) or body (fallback)
+            </div>
+          </div>
+
+          <div class="tab-content" id="tab-privacy" style="display:none">
+            <div class="small-note" style="margin-bottom:20px;">
+              Privacy controls for your browsing experience.
+            </div>
+            <div class="field-row">
+              <label><input type="checkbox" id="disable-friendslist" /> Hide Friendslist</label>
+            </div>
+            <div class="field-row">
+              <label><input type="checkbox" id="blur-sensitive" /> Blur Sensitive Content</label>
+            </div>
+            <div class="field-row">
+              <label><input type="checkbox" id="blur-comments" /> Blur Comments</label>
+            </div>
+            <div class="small-note" style="margin-top:16px;">
+              Hover over blurred content to reveal it.
+            </div>
+          </div>
+
+          <div class="tab-content" id="tab-styles" style="display:none">
+            <div class="field-row">
+              <label><input type="checkbox" id="glass-toggle" /> Enable Glass Panels</label>
+            </div>
+            <div class="field-row">
+              <span class="field-label">Border Radius</span>
+              <input id="glass-radius" type="number" min="0" max="50" value="6" style="width:80px"/>
+              <span style="color:#a0c8c0;">px</span>
+            </div>
+            <div class="field-row">
+              <span class="field-label">Hue</span>
+              <input id="glass-hue" type="range" min="0" max="360" value="170" style="flex:1"/>
+              <span id="glass-hue-val" style="min-width:40px; text-align:right; color:#4adeb7;">170</span>
+            </div>
+            <div class="field-row">
+              <span class="field-label">Alpha</span>
+              <input id="glass-alpha" type="range" min="1" max="50" value="18" style="flex:1"/>
+              <span id="glass-alpha-val" style="min-width:40px; text-align:right; color:#4adeb7;">18</span>
+            </div>
+            <div style="margin-top:24px">
+              <span class="field-label" style="display:block; margin-bottom:8px;">Online CSS URLs (one per line)</span>
+              <textarea id="online-styles" rows="4" style="width:100%; resize:vertical;"></textarea>
+            </div>
+            <div style="margin-top:16px">
+              <span class="field-label" style="display:block; margin-bottom:8px;">Custom CSS</span>
+              <textarea id="custom-css" rows="6" style="width:100%; resize:vertical;"></textarea>
+            </div>
+          </div>
+
+          <div class="tab-content" id="tab-fonts" style="display:none">
+            <div class="field-row">
+              <span class="field-label">Font Family</span>
+              <select id="main-font" style="flex:1">
+                <option value="default">System Default</option>
+                <option value="roboto">Roboto</option>
+                <option value="comfortaa">Comfortaa</option>
+                <option value="online">Custom Online Font</option>
+              </select>
+            </div>
+            <div class="field-row">
+              <span class="field-label">Font URL</span>
+              <input id="online-font-url" type="text" placeholder="https://fonts.googleapis.com/..." style="flex:1"/>
+            </div>
+            <div class="small-note" style="margin-top:16px;">
+              For Google Fonts, copy the &lt;link&gt; href URL.
+            </div>
+          </div>
+
+          <div class="tab-content" id="tab-plugins" style="display:none">
+            <div class="small-note" style="margin-bottom:20px;">
+              Add external plugins via GitHub raw URLs. Plugins should export valid JavaScript code.
+            </div>
+            <div class="field-row">
+              <input id="plugin-url" type="text" placeholder="https://raw.githubusercontent.com/..." style="flex:1"/>
+              <button id="add-plugin" class="button">Add Plugin</button>
+            </div>
+            <div id="plugin-list" style="margin-top:24px;">
+              <!-- Plugins will be rendered here -->
+            </div>
+          </div>
+
+          <div class="tab-content" id="tab-risky" style="display:none">
+            <div style="background:rgba(239,71,111,0.12); border:1px solid rgba(239,71,111,0.3); border-radius:10px; padding:16px; margin-bottom:24px;">
+              <strong style="color:#ef476f;">⚠️ Use At Your Own Risk</strong>
+              <p class="small-note" style="margin-top:8px;">These features may violate Terms of Service.</p>
+            </div>
+            <div class="field-row">
+              <label><input type="checkbox" id="appear-offline" /> Appear Offline (blocks pulse requests)</label>
+            </div>
+            <div class="field-row">
+              <label><input type="checkbox" id="friend-activity" /> Friend Activity Monitor</label>
+            </div>
+            <div class="field-row">
+              <label><input type="checkbox" id="player-type" /> Player Type Display</label>
+            </div>
+            <div class="field-row">
+              <label><input type="checkbox" id="lazy-streak" /> Lazy Streak Keeper</label>
+            </div>
+            <div class="small-note" style="margin-top:16px;">
+              Streak Keeper requires friending profile <a href="https://www.kogama.com/profile/670350173/" target="_blank">670350173</a>.
+            </div>
+          </div>
+
+          <div class="tab-content" id="tab-about" style="display:none">
+            <div style="text-align:center; padding:20px 0;">
+              <h3 style="color:#4adeb7; margin-bottom:16px; font-size:20px;">◆ Utilify V2 ◆</h3>
+              <p class="small-note" style="font-size:13px; line-height:1.8; margin-bottom:24px;">
+                Made by Community For Community.<br>
+                Design inspired by Zhuang Fangyi from A: Endfield<br><br>
+                Fully maintained by <a href="https://www.github.com/gxthickitty/utilify" target="_blank">Simon</a>
+              </p>
+              <div style="border-top:1px solid rgba(74, 222, 183, 0.15); padding-top:20px;">
+                <h4 style="color:#6ef0cb; font-size:14px; margin-bottom:16px;">Contributors</h4>
+                <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:12px; font-size:13px; color:#a0c8c0;">
+                  <div>Death Wolf.</div>
+                  <div>Snowy</div>
+                  <div>Awoi</div>
+                  <div>Selene</div>
+                  <div>Tungsten</div>
+                  <div>Raptor</div>
+                  <div>Comenxo</div>
+                  <div>Idealism</div>
+                  <div>Sorry</div>
+                  <div>Zpayer</div>
+                  <div>ReZa</div> 
+                  <div>ValDon</div>
+                </div>
+                <p class="small-note" style="margin-top:16px;">Thank you to all testers and supporters! ✨</p>
+              </div>
+            </div>
+          </div>
+        `;
+      },
+      
+      setupEvents() {
+        this.panel.querySelectorAll('.tab').forEach(tab => {
+          tab.addEventListener('click', () => {
+            this.panel.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            this.panel.querySelectorAll('.tab-content').forEach(c => c.style.display = 'none');
+            tab.classList.add('active');
+            this.panel.querySelector(`#tab-${tab.dataset.tab}`).style.display = '';
+            
+            if (tab.dataset.tab === 'plugins') {
+              this.renderPluginList();
+            }
+          });
+        });
+        
+        this.panel.querySelector('.close').addEventListener('click', () => this.hide());
+        
+        // Gradient controls
+        const angleInput = this.panel.querySelector('#gradient-angle');
+        const angleVal = this.panel.querySelector('#angle-val');
+        const color1 = this.panel.querySelector('#color1');
+        const color2 = this.panel.querySelector('#color2');
+        const color1hex = this.panel.querySelector('#color1hex');
+        const color2hex = this.panel.querySelector('#color2hex');
+        const gradientInput = this.panel.querySelector('#gradient-input');
+
+        const updateGradientLive = debounce(() => {
+          const angle = angleInput.value;
+          const c1 = color1.value;
+          const c2 = color2.value;
+          const grad = `linear-gradient(${angle}deg, ${c1}, ${c2})`;
+          
+          gradientInput.value = grad;
+          Styles.applyGradient(grad, angle, c1, c2);
+          
+          const cfg = Storage.getConfig();
+          cfg.gradient = grad;
+          cfg.gradientAngle = angle;
+          cfg.gradientColor1 = c1;
+          cfg.gradientColor2 = c2;
+          Storage.saveConfig(cfg);
+        }, 150);
+
+        angleInput.addEventListener('input', () => {
+          angleVal.textContent = angleInput.value + '°';
+          updateGradientLive();
+        });
+
+        color1.addEventListener('input', () => {
+          color1hex.value = color1.value;
+          updateGradientLive();
+        });
+
+        color2.addEventListener('input', () => {
+          color2hex.value = color2.value;
+          updateGradientLive();
+        });
+
+        color1hex.addEventListener('change', (e) => {
+          const val = e.target.value.trim();
+          if (/^#[0-9a-f]{3,6}$/i.test(val)) {
+            color1.value = val;
+            updateGradientLive();
+          }
+        });
+
+        color2hex.addEventListener('change', (e) => {
+          const val = e.target.value.trim();
+          if (/^#[0-9a-f]{3,6}$/i.test(val)) {
+            color2.value = val;
+            updateGradientLive();
+          }
+        });
+
+        gradientInput.addEventListener('input', debounce(() => {
+          const val = gradientInput.value.trim();
+          if (!val) return;
+          const match = val.match(/linear-gradient\((\d+)deg\s*,\s*(#[0-9a-f]{3,6})\s*,\s*(#[0-9a-f]{3,6})\)/i);
+          if (match) {
+            angleInput.value = match[1];
+            angleVal.textContent = match[1] + '°';
+            color1.value = match[2];
+            color2.value = match[3];
+            color1hex.value = match[2];
+            color2hex.value = match[3];
+            Styles.applyGradient(val, match[1], match[2], match[3]);
+            
+            const cfg = Storage.getConfig();
+            cfg.gradient = val;
+            cfg.gradientAngle = match[1];
+            cfg.gradientColor1 = match[2];
+            cfg.gradientColor2 = match[3];
+            Storage.saveConfig(cfg);
+          }
+        }, 300));
+
+        this.panel.querySelector('#gradient-apply').addEventListener('click', updateGradientLive);
+        
+        this.panel.querySelector('#gradient-copy').addEventListener('click', () => {
+          const val = gradientInput.value.trim();
+          if (val && navigator.clipboard) {
+            navigator.clipboard.writeText(val);
+            const btn = this.panel.querySelector('#gradient-copy');
+            const orig = btn.textContent;
+            btn.textContent = 'Copied! ✓';
+            setTimeout(() => btn.textContent = orig, 1500);
+          }
+        });
+        
+        this.panel.querySelector('#gradient-clear').addEventListener('click', () => {
+          const cfg = Storage.getConfig();
+          cfg.gradient = null;
+          Storage.saveConfig(cfg);
+          Styles.applyGradient(null);
+          gradientInput.value = '';
+        });
+        
+        // Privacy toggles
+        ['disable-friendslist', 'blur-sensitive', 'blur-comments'].forEach(id => {
+          this.panel.querySelector(`#${id}`).addEventListener('change', (e) => {
+            const cfg = Storage.getConfig();
+            const key = id.replace(/-([a-z])/g, (_, l) => l.toUpperCase());
+            cfg[key] = e.target.checked;
+            Storage.saveConfig(cfg);
+            Styles.applyPrivacy(cfg);
+          });
+        });
+        
+        // Glass panels
+        this.panel.querySelector('#glass-toggle').addEventListener('change', (e) => {
+          const cfg = Storage.getConfig();
+          cfg.glassPanels.enabled = e.target.checked;
+          Storage.saveConfig(cfg);
+          Styles.applyGlass(cfg);
+        });
+
+        this.panel.querySelector('#glass-radius').addEventListener('change', (e) => {
+          const cfg = Storage.getConfig();
+          cfg.glassPanels.radius = parseInt(e.target.value) || 6;
+          Storage.saveConfig(cfg);
+          Styles.applyGlass(cfg);
+        });
+        
+        const hueInput = this.panel.querySelector('#glass-hue');
+        const hueVal = this.panel.querySelector('#glass-hue-val');
+        const alphaInput = this.panel.querySelector('#glass-alpha');
+        const alphaVal = this.panel.querySelector('#glass-alpha-val');
+        
+        hueInput.addEventListener('input', debounce(() => {
+          hueVal.textContent = hueInput.value;
+          const cfg = Storage.getConfig();
+          cfg.glassPanels.hue = parseInt(hueInput.value);
+          Storage.saveConfig(cfg);
+          Styles.applyGlass(cfg);
+        }, 150));
+
+        alphaInput.addEventListener('input', debounce(() => {
+          alphaVal.textContent = alphaInput.value;
+          const cfg = Storage.getConfig();
+          cfg.glassPanels.alpha = parseInt(alphaInput.value) / 100;
+          Storage.saveConfig(cfg);
+          Styles.applyGlass(cfg);
+        }, 150));
+
+        this.panel.querySelector('#online-styles').addEventListener('change', (e) => {
+          const cfg = Storage.getConfig();
+          cfg.onlineStyles = e.target.value;
+          Storage.saveConfig(cfg);
+          Styles.loadOnlineCSS(cfg.onlineStyles);
+        });
+        
+        this.panel.querySelector('#custom-css').addEventListener('change', (e) => {
+          const cfg = Storage.getConfig();
+          cfg.customCSS = e.target.value;
+          Storage.saveConfig(cfg);
+          Styles.applyCustomCSS(cfg.customCSS);
+        });
+
+        // Fonts
+        this.panel.querySelector('#main-font').addEventListener('change', (e) => {
+          const cfg = Storage.getConfig();
+          cfg.fontFamily = e.target.value;
+          Storage.saveConfig(cfg);
+          
+          if (e.target.value === 'roboto') {
+            Styles.applyFont('Roboto', 'https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap');
+          } else if (e.target.value === 'comfortaa') {
+            Styles.applyFont('Comfortaa', 'https://fonts.googleapis.com/css2?family=Comfortaa:wght@300;400;700&display=swap');
+          } else if (e.target.value === 'online' && cfg.onlineFont) {
+            Styles.loadOnlineFont(cfg.onlineFont);
+          } else {
+            Styles.applyFont(null, null);
+          }
+        });
+
+        this.panel.querySelector('#online-font-url').addEventListener('change', (e) => {
+          const url = e.target.value.trim();
+          const cfg = Storage.getConfig();
+          cfg.onlineFont = url;
+          Storage.saveConfig(cfg);
+          
+          if (url) {
+            Styles.loadOnlineFont(url);
+            if (cfg.fontFamily !== 'online') {
+              cfg.fontFamily = 'online';
+              this.panel.querySelector('#main-font').value = 'online';
+              Storage.saveConfig(cfg);
+            }
+          }
+        });
+
+        // Plugins - YET TO BE FULLY IMPLEMENTED!
+        this.panel.querySelector('#add-plugin').addEventListener('click', async () => {
+          const url = this.panel.querySelector('#plugin-url').value.trim();
+          if (!url) return;
+
+          const btn = this.panel.querySelector('#add-plugin');
+          const origText = btn.textContent;
+          btn.textContent = 'Loading...';
+          btn.disabled = true;
+
+          try {
+            await PluginManager.addPlugin(url);
+            this.panel.querySelector('#plugin-url').value = '';
+            this.renderPluginList();
+            btn.textContent = 'Added! ';
+          } catch (error) {
+            alert(`Failed to add plugin: ${error.message}`);
+            btn.textContent = origText;
+          }
+
+          btn.disabled = false;
+          setTimeout(() => btn.textContent = origText, 2000);
+        });
+
+        // Risky features
+        this.panel.querySelector('#appear-offline').addEventListener('change', (e) => {
+          const cfg = Storage.getConfig();
+          cfg.appearOffline = e.target.checked;
+          Storage.saveConfig(cfg);
+          e.target.checked ? RiskyFeatures.installPulseBlocker() : RiskyFeatures.uninstallPulseBlocker();
+        });
+
+        this.panel.querySelector('#friend-activity').addEventListener('change', (e) => {
+          const cfg = Storage.getConfig();
+          cfg.friendActivity = e.target.checked;
+          Storage.saveConfig(cfg);
+          e.target.checked ? RiskyFeatures.enableFriendActivity() : RiskyFeatures.disableFriendActivity();
+        });
+
+        this.panel.querySelector('#player-type').addEventListener('change', (e) => {
+          const cfg = Storage.getConfig();
+          cfg.playerTypeDisplay = e.target.checked;
+          Storage.saveConfig(cfg);
+          e.target.checked ? RiskyFeatures.enablePlayerTypeDisplay() : RiskyFeatures.disablePlayerTypeDisplay();
+        });
+
+        this.panel.querySelector('#lazy-streak').addEventListener('change', (e) => {
+          const cfg = Storage.getConfig();
+          cfg.lazyStreakKeeper = e.target.checked;
+          Storage.saveConfig(cfg);
+          e.target.checked ? RiskyFeatures.enableStreakKeeper() : RiskyFeatures.disableStreakKeeper();
+        });
+      },
+
+      renderPluginList() {
+        const container = this.panel.querySelector('#plugin-list');
+        const plugins = Storage.getPlugins();
+
+        if (plugins.length === 0) {
+          container.innerHTML = '<div class="small-note">No plugins installed.</div><div class="small-note">This feature is not fully implemented yet.</div>';
+          return;
+        }
+
+        container.innerHTML = plugins.map(plugin => `
+          <div class="plugin-item">
+            <div class="plugin-info">
+              <h4>${plugin.name}</h4>
+              <p>${plugin.description}</p>
+            </div>
+            <div class="plugin-controls">
+              <button class="button plugin-toggle" data-id="${plugin.id}">
+                ${plugin.enabled ? 'Disable' : 'Enable'}
+              </button>
+              <button class="button plugin-remove" data-id="${plugin.id}">Remove</button>
+            </div>
+          </div>
+        `).join('');
+
+        //  Plugins - YET TO BE FULLY IMPLEMENTED!
+        container.querySelectorAll('.plugin-toggle').forEach(btn => {
+          btn.addEventListener('click', () => {
+            PluginManager.togglePlugin(btn.dataset.id);
+            this.renderPluginList();
+          });
+        });
+
+        container.querySelectorAll('.plugin-remove').forEach(btn => {
+          btn.addEventListener('click', () => {
+            if (confirm('Remove this plugin?')) {
+              PluginManager.removePlugin(btn.dataset.id);
+              this.renderPluginList();
+            }
+          });
+        });
+      },
+      
+      enableDrag() {
+        const header = this.panel.querySelector('.header');
+        let isDragging = false;
+        let startX = 0, startY = 0, startLeft = 0, startTop = 0;
+        
+        header.addEventListener('mousedown', (e) => {
+          if (e.target.closest('.close')) return;
+          isDragging = true;
+          startX = e.clientX;
+          startY = e.clientY;
+          const rect = this.panel.getBoundingClientRect();
+          startLeft = rect.left;
+          startTop = rect.top;
+          header.style.cursor = 'grabbing';
+          this.panel.style.transition = 'none';
+        });
+        
+        document.addEventListener('mousemove', (e) => {
+          if (!isDragging) return;
+          const dx = e.clientX - startX;
+          const dy = e.clientY - startY;
+          this.panel.style.left = (startLeft + dx) + 'px';
+          this.panel.style.top = (startTop + dy) + 'px';
+          this.panel.style.transform = 'none';
+        });
+        
+        document.addEventListener('mouseup', () => {
+          if (!isDragging) return;
+          isDragging = false;
+          header.style.cursor = '';
+          setTimeout(() => {
+            this.panel.style.transition = '';
+          }, 50);
+        });
+      },
+      
+      show() {
+        this.panel.classList.add('visible');
+        const cfg = Storage.getConfig();
+        this.loadConfig(cfg);
+      },
+      
+      hide() {
+        this.panel.classList.remove('visible');
+      },
+      
+      loadConfig(cfg) {
+        this.panel.querySelector('#gradient-angle').value = cfg.gradientAngle;
+        this.panel.querySelector('#angle-val').textContent = cfg.gradientAngle + '°';
+        this.panel.querySelector('#color1').value = cfg.gradientColor1;
+        this.panel.querySelector('#color2').value = cfg.gradientColor2;
+        this.panel.querySelector('#color1hex').value = cfg.gradientColor1;
+        this.panel.querySelector('#color2hex').value = cfg.gradientColor2;
+        this.panel.querySelector('#gradient-input').value = cfg.gradient || `linear-gradient(${cfg.gradientAngle}deg, ${cfg.gradientColor1}, ${cfg.gradientColor2})`;
+        this.panel.querySelector('#disable-friendslist').checked = cfg.disableFriendslist;
+        this.panel.querySelector('#blur-sensitive').checked = cfg.blurSensitive;
+        this.panel.querySelector('#blur-comments').checked = cfg.blurComments;
+        this.panel.querySelector('#glass-toggle').checked = cfg.glassPanels.enabled;
+        this.panel.querySelector('#glass-radius').value = cfg.glassPanels.radius;
+        this.panel.querySelector('#glass-hue').value = cfg.glassPanels.hue;
+        this.panel.querySelector('#glass-hue-val').textContent = cfg.glassPanels.hue;
+        this.panel.querySelector('#glass-alpha').value = Math.round((cfg.glassPanels.alpha || 0.18) * 100);
+        this.panel.querySelector('#glass-alpha-val').textContent = Math.round((cfg.glassPanels.alpha || 0.18) * 100);
+        this.panel.querySelector('#online-styles').value = cfg.onlineStyles;
+        this.panel.querySelector('#custom-css').value = cfg.customCSS;
+        this.panel.querySelector('#main-font').value = cfg.fontFamily || 'default';
+        this.panel.querySelector('#online-font-url').value = cfg.onlineFont || '';
+        this.panel.querySelector('#appear-offline').checked = cfg.appearOffline;
+        this.panel.querySelector('#friend-activity').checked = cfg.friendActivity;
+        this.panel.querySelector('#player-type').checked = cfg.playerTypeDisplay;
+        this.panel.querySelector('#lazy-streak').checked = cfg.lazyStreakKeeper;
+      }
+    };
+
+    function createSettingsButton() {
+      if (document.getElementById('utilify_settings_btn')) return;
+
+      const tryInject = () => {
+        const targetList = document.querySelector('ol._3hI0M');
+        if (!targetList) return false;
+
+        const li = document.createElement('li');
+        li.className = '_3WhKY';
+
+        const btn = document.createElement('button');
+        btn.id = 'utilify_settings_btn';
+        btn.setAttribute('aria-label', 'Open Utilify Settings');
+        btn.innerHTML = '◆';
+
+        btn.style.cssText = `
+          width: 26px;
+          height: 26px;
+          border-radius: 50%;
+          background: linear-gradient(135deg, rgba(74, 222, 183, 0.25), rgba(42, 157, 143, 0.2));
+          backdrop-filter: blur(10px);
+          border: 1px solid rgba(74, 222, 183, 0.4);
+          color: #4adeb7;
+          font-size: 11px;
+          line-height: 1;
+          margin-right: 8px;
+          cursor: pointer;
+          box-shadow: 0 4px 20px rgba(74, 222, 183, 0.25);
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transform-origin: 50% 50%;
+        `;
+
+        btn.addEventListener('mouseenter', () => {
+          btn.style.transform = 'scale(1.15)';
+          btn.style.boxShadow = '0 6px 30px rgba(74, 222, 183, 0.4)';
+          btn.style.borderColor = 'rgba(74, 222, 183, 0.6)';
+        });
+
+        btn.addEventListener('mouseleave', () => {
+          btn.style.transform = 'scale(1)';
+          btn.style.boxShadow = '0 4px 20px rgba(74, 222, 183, 0.25)';
+          btn.style.borderColor = 'rgba(74, 222, 183, 0.4)';
+        });
+
+        btn.addEventListener('click', () => UI.show());
+
+        li.appendChild(btn);
+        targetList.insertBefore(li, targetList.firstElementChild);
+
+        return true;
+      };
+
+      if (tryInject()) return;
+
+      const observer = new MutationObserver(() => {
+        if (tryInject()) observer.disconnect();
+      });
+
+      observer.observe(document.body, {
+        childList: true,
+        subtree: true
+      });
+    }
+
+    function init() {
+      Styles.initBase();
+      UI.create();
+      createSettingsButton();
+      
+      const cfg = Storage.getConfig();
+      Styles.applyGradient(cfg.gradient);
+      Styles.applyPrivacy(cfg);
+      Styles.applyGlass(cfg);
+      Styles.applyCustomCSS(cfg.customCSS);
+      Styles.loadOnlineCSS(cfg.onlineStyles);
+
+      if (cfg.fontFamily === 'roboto') {
+        Styles.applyFont('Roboto', 'https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap');
+      } else if (cfg.fontFamily === 'comfortaa') {
+        Styles.applyFont('Comfortaa', 'https://fonts.googleapis.com/css2?family=Comfortaa:wght@300;400;700&display=swap');
+      } else if (cfg.fontFamily === 'online' && cfg.onlineFont) {
+        Styles.loadOnlineFont(cfg.onlineFont);
+      }
+
+      if (cfg.appearOffline) RiskyFeatures.installPulseBlocker();
+      if (cfg.friendActivity) RiskyFeatures.enableFriendActivity();
+      if (cfg.playerTypeDisplay) RiskyFeatures.enablePlayerTypeDisplay();
+      if (cfg.lazyStreakKeeper) RiskyFeatures.enableStreakKeeper();
+
+      // Load plugins
+      PluginManager.loadAllPlugins();
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', init);
+    } else {
+      init();
+    }
+
+    window.addEventListener('beforeunload', () => {
+      RiskyFeatures.disableFriendActivity();
+      RiskyFeatures.disablePlayerTypeDisplay();
+      RiskyFeatures.disableStreakKeeper();
+    });
+})();
+
+// Creation Date, Last Seen, *Last Played, WebArchive
+// <span class="_20K92">Joined KoGaMa on ...</span>
+(() => {
+    'use strict';
+    const injectStyles = () => {
+        const css = `
+            @keyframes sparkle {
+                0%, 100% { opacity: 0.4; transform: scale(1); }
+                50% { opacity: 1; transform: scale(1.1); }
+            }
+            @keyframes fadeIn {
+                from { opacity: 0; transform: translateY(4px); }
+                to { opacity: 1; transform: translateY(0); }
+            }
+
+            .profile-info-wrapper {
+                display: flex;
+                align-items: center;
+                flex-wrap: wrap;
+                margin-top: 4px;
+                gap: 6px;
+                animation: fadeIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            }
+
+            .profile-info-item {
+                display: inline-flex;
+                align-items: center;
+                gap: 5px;
+                padding: 4px 10px;
+                background: linear-gradient(135deg, rgba(0,128,128,0.08) 0%, rgba(46,139,86,0.05) 100%);
+                border: 1px solid rgba(0,128,128,0.2);
+                border-radius: 20px;        
+                font-size: 11px;
+                font-weight: 500;
+                cursor: pointer;
+                white-space: nowrap;
+                transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+                backdrop-filter: blur(4px);
+                color: #e0f0e0;
+                line-height: 1.3;
+            }
+            .profile-info-item:hover {
+                background: linear-gradient(135deg, rgba(0,128,128,0.15) 0%, rgba(46,139,86,0.1) 100%);
+                border-color: rgba(0,128,128,0.4);
+                transform: translateY(-1px);
+                box-shadow: 0 3px 8px rgba(0,128,128,0.2);
+            }
+            .profile-info-item.expanded {
+                background: linear-gradient(135deg, rgba(0,128,128,0.12) 0%, rgba(46,139,86,0.08) 100%);
+                border-color: rgba(0,128,128,0.3);
+                max-width: 380px;
+                white-space: normal;
+                word-break: break-word;
+            }
+
+            .profile-info-icon {
+                width: 14px;
+                height: 14px;
+                fill: currentColor;
+                opacity: 0.85;
+                animation: sparkle 3s ease-in-out infinite;
+                flex-shrink: 0;
+            }
+
+            .profile-info-text {
+                color: #e8f0e8;
+                font-weight: 500;
+                transition: all 0.2s ease;
+            }
+            .profile-info-full {
+                color: #a0d6b4;
+                font-weight: 400;
+                font-size: 10.5px;
+                display: none;
+            }
+
+            .profile-link-item {
+                display: inline-flex;
+                align-items: center;
+                gap: 5px;
+                padding: 4px 10px;
+                background: linear-gradient(135deg, rgba(46,139,86,0.1) 0%, rgba(0,128,128,0.08) 100%);
+                border: 1px solid rgba(46,139,86,0.25);
+                border-radius: 20px;
+                font-size: 11px;
+                font-weight: 500;
+                color: #c0e0c0;
+                text-decoration: none;
+                white-space: nowrap;
+                transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+                backdrop-filter: blur(4px);
+                line-height: 1.3;
+            }
+            .profile-link-item:hover {
+                background: linear-gradient(135deg, rgba(46,139,86,0.18) 0%, rgba(0,128,128,0.15) 100%);
+                border-color: rgba(0,128,128,0.5);
+                transform: translateY(-1px);
+                box-shadow: 0 3px 8px rgba(46,139,86,0.25);
+                color: #d8f0d8;
+            }
+            .profile-link-icon {
+                width: 14px;
+                height: 14px;
+                fill: currentColor;
+                animation: sparkle 3.5s ease-in-out infinite;
+                animation-delay: 0.3s;
+                flex-shrink: 0;
+            }
+        `;
+        const style = document.createElement('style');
+        style.textContent = css;
+        document.head.appendChild(style);
+    };
+    const formatVerbose = (dateString, prefix = '') => {
+        const date = new Date(dateString);
+        const day = date.getDate();
+        const suffix = (day % 100 >= 11 && day % 100 <= 13) ? 'th' 
+            : ['st', 'nd', 'rd'][day % 10 - 1] || 'th';
+        const months = ['January','February','March','April','May','June',
+            'July','August','September','October','November','December'];
+        const month = months[date.getMonth()];
+        const year = date.getFullYear();
+        const hours = String(date.getHours()).padStart(2,'0');
+        const minutes = String(date.getMinutes()).padStart(2,'0');
+        const tz = -date.getTimezoneOffset();
+        const tzStr = `GMT${tz >= 0 ? '+' : '-'}${Math.floor(Math.abs(tz)/60)}`;
+        return `${prefix}${day}${suffix} ${month} ${year}, ${hours}:${minutes} ${tzStr}`;
+    };
+
+    const formatRelativePrecise = (dateString) => {
+        const seconds = Math.floor((Date.now() - new Date(dateString)) / 1000);
+        if (seconds < 60) return 'just now';
+        const intervals = [
+            { value: 31536000, unit: 'y', decimals: 1 },
+            { value: 2592000, unit: 'mo', decimals: 1 },
+            { value: 86400, unit: 'd', decimals: 0 },
+            { value: 3600, unit: 'h', decimals: 0 },
+            { value: 60, unit: 'm', decimals: 0 }
+        ];
+        for (const iv of intervals) {
+            if (seconds >= iv.value) {
+                let val = seconds / iv.value;
+                if (iv.decimals === 1) val = val.toFixed(1);
+                else val = Math.floor(val);
+                return `${val}${iv.unit} ago`;
+            }
+        }
+        return 'just now';
+    };
+
+    const createSVGIcon = (type) => {
+        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.setAttribute('viewBox', '0 0 24 24');
+        svg.classList.add(type === 'link' ? 'profile-link-icon' : 'profile-info-icon');
+        let path;
+        switch (type) {
+            case 'calendar':
+                path = 'M7 2v2H5v-2H3v4h18v-4h-2v2h-2v-2h-2v2h-2v-2h-2v2h-2v-2h-2v2h-2v-2zm-4 6v12a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-12zm2 2h14v10h-14z'; // simple calendar
+                break;
+            case 'eye':
+                path = 'M12 5C5.636 5 2 12 2 12s3.636 7 10 7 10-7 10-7-3.636-7-10-7zm0 12a5 5 0 1 1 0-10 5 5 0 0 1 0 10zm0-2a3 3 0 1 0 0-6 3 3 0 0 0 0 6z';
+                break;
+            case 'gamepad':
+                path = 'M18 7h-2v2h-2v2h-2v2h-2v-2h-2v-2h-2v-2h-2v2h2v2h2v2h2v2h2v-2h2v-2h2v-2h2v-2zm-2-2h2v2h2v2h2v2h-2v-2h-2v-2h-2zm-8 0v2h-2v2h-2v-2h2v-2zm-2 8h2v2h2v2h-2v-2h-2zm10 0h2v2h2v2h-2v-2h-2z'; // simplified gamepad
+                break;
+            case 'archive':
+                path = 'M4 3h16l2 4v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7l2-4zm0 4v12h16V7H4zm2 2h12v2H6V9zm0 4h12v2H6v-2z';
+                break;
+            default: path = '';
+        }
+        const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        p.setAttribute('d', path);
+        svg.appendChild(p);
+        return svg;
+    };
+
+    const createToggleInfo = (iconType, compactText, fullText) => {
+        const container = document.createElement('div');
+        container.className = 'profile-info-item';
+
+        const icon = createSVGIcon(iconType);
+        const compactSpan = document.createElement('span');
+        compactSpan.className = 'profile-info-text';
+        compactSpan.textContent = compactText;
+        const fullSpan = document.createElement('span');
+        fullSpan.className = 'profile-info-full';
+        fullSpan.textContent = fullText;
+
+        container.appendChild(icon);
+        container.appendChild(compactSpan);
+        container.appendChild(fullSpan);
+
+        let expanded = false;
+        container.addEventListener('click', (e) => {
+            e.stopPropagation();
+            expanded = !expanded;
+            if (expanded) {
+                container.classList.add('expanded');
+                compactSpan.style.display = 'none';
+                fullSpan.style.display = 'inline';
+            } else {
+                container.classList.remove('expanded');
+                compactSpan.style.display = 'inline';
+                fullSpan.style.display = 'none';
+            }
+        });
+        return container;
+    };
+
+    const getBootstrapData = () => {
+        const scripts = document.querySelectorAll('script');
+        for (const script of scripts) {
+            const text = script.textContent;
+            if (!text?.includes('options.bootstrap')) continue;
+            try {
+                const match = text.match(/options\.bootstrap\s*=\s*({[\s\S]*?});/);
+                if (!match) continue;
+                const data = Function(`"use strict"; return (${match[1]});`)();
+                return data?.object || null;
+            } catch (e) {
+                console.debug('Bootstrap parse error (non-critical)', e);
+            }
+        }
+        return null;
+    };
+    const getLastPlayedGame = () => {
+        try {
+            const cached = localStorage.getItem('__amplify__cache:game:last-played');
+            if (!cached) return null;
+            const parsed = JSON.parse(cached);
+            return parsed?.data || null;
+        } catch {
+            return null;
+        }
+    };
+
+    const enhance = () => {
+        const span = document.querySelector('div._2IqY6 span._20K92');
+        if (!span || span.dataset.enhanced === 'true') return false;
+
+        const bootstrap = getBootstrapData();
+        if (!bootstrap?.created || !bootstrap?.last_ping) return false;
+
+        const { created, last_ping, is_me } = bootstrap;
+        const gameInfo = getLastPlayedGame();
+        const wrapper = document.createElement('div');
+        wrapper.className = 'profile-info-wrapper';
+        wrapper.appendChild(createToggleInfo(
+            'calendar',
+            formatRelativePrecise(created),
+            formatVerbose(created, 'Created @ ')
+        ));
+        wrapper.appendChild(createToggleInfo(
+            'eye',
+            formatRelativePrecise(last_ping),
+            formatVerbose(last_ping, 'Last seen @ ')
+        ));
+        if (is_me && gameInfo?.id && gameInfo?.name) {
+            const gameLink = document.createElement('a');
+            gameLink.className = 'profile-link-item';
+            gameLink.href = `https://www.kogama.com/games/play/${gameInfo.id}/`;
+            gameLink.target = '_blank';
+            gameLink.rel = 'noopener';
+            gameLink.title = gameInfo.name;
+
+            const icon = createSVGIcon('gamepad');
+            icon.classList.remove('profile-info-icon');
+            icon.classList.add('profile-link-icon');
+
+            const nameSpan = document.createElement('span');
+            let displayName = gameInfo.name;
+            if (displayName.length > 16) displayName = displayName.slice(0, 14) + '…';
+            nameSpan.textContent = displayName;
+
+            gameLink.appendChild(icon);
+            gameLink.appendChild(nameSpan);
+            wrapper.appendChild(gameLink);
+        }
+        const archiveLink = document.createElement('a');
+        archiveLink.className = 'profile-link-item';
+        archiveLink.href = `https://web.archive.org/web/*/${location.href}`;
+        archiveLink.target = '_blank';
+        archiveLink.rel = 'noopener';
+        archiveLink.title = 'View on Internet Archive';
+
+        const archiveIcon = createSVGIcon('archive');
+        archiveIcon.classList.remove('profile-info-icon');
+        archiveIcon.classList.add('profile-link-icon');
+
+        const archiveText = document.createElement('span');
+        archiveText.textContent = 'Archive';
+
+        archiveLink.appendChild(archiveIcon);
+        archiveLink.appendChild(archiveText);
+        wrapper.appendChild(archiveLink);
+        span.dataset.enhanced = 'true';
+        span.innerHTML = '';
+        span.appendChild(wrapper);
+        return true;
+    };
+    const init = () => {
+        injectStyles();
+        setTimeout(() => {
+            if (!enhance()) {
+                const observer = new MutationObserver((mutations, obs) => {
+                    if (enhance()) obs.disconnect();
+                });
+                observer.observe(document.body, { childList: true, subtree: true });
+                setTimeout(() => observer.disconnect(), 5000);
+            }
+        }, 400);
+    };
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
+})();
+
+// Display User Account Level Compactly
+(function () {
+    "use strict";
+
+    function getLevel() {
+        for (const s of document.scripts) {
+            const t = s.textContent;
+            if (!t || t.indexOf("options.bootstrap") === -1) continue;
+            const m = t.match(/options\.bootstrap\s*=\s*({[\s\S]*?})\s*;/);
+            if (!m) continue;
+            try {
+                const j = JSON.parse(m[1]);
+                if (j && j.object && typeof j.object.level === "number") return j.object.level;
+            } catch {}
+        }
+        return null;
+    }
+
+    function add(level) {
+        if (level == null) return;
+        const box = document.querySelector("div._2IqY6");
+        if (!box) return;
+        const h1 = box.querySelector("h1");
+        if (!h1) return;
+        if (box.querySelector(".tm-level")) return;
+        const d = document.createElement("div");
+        d.className = "tm-level";
+        d.textContent = "Level " + level;
+        d.style.fontSize = "12px";
+        d.style.opacity = "0.85";
+        d.style.fontWeight = "600";
+        h1.insertAdjacentElement("afterend", d);
+    }
+
+    function tryRun() {
+        const level = getLevel();
+        if (level != null) add(level);
+    }
+
+    const obs = new MutationObserver(() => {
+        if (document.querySelector("div._2IqY6 h1")) {
+            obs.disconnect();
+            setTimeout(tryRun, 50);
+        }
+    });
+
+    obs.observe(document.documentElement, { childList: true, subtree: true });
+    tryRun();
+})();
+
+(() => { // dot obfuscation + paste enable
+  'use strict';
+  const WHITELISTED_DOMAINS = ['youtube.com', 'youtu.be',"fonts.googleapis.com"];
+
+  const URL_REGEX =
+    /\bhttps?:\/\/(?:www\.)?([\w.-]+\.[a-z]{2,})(?:\/[^\s]*)?/gi;
+
+  const isTextInput = el =>
+    el &&
+    (el.tagName === 'TEXTAREA' ||
+      (el.tagName === 'INPUT' &&
+        ['text', 'search', 'url', 'email', 'tel', 'password'].includes(el.type)));
+
+  const isWhitelisted = domain =>
+    WHITELISTED_DOMAINS.some(w => domain === w || domain.endsWith('.' + w));
+
+  const obfuscateURLs = text =>
+    text.replace(URL_REGEX, (match, domain) =>
+      isWhitelisted(domain)
+        ? match
+        : match.replace(/\./g, '%2E')
+    );
+
+  const processValue = el => {
+    const start = el.selectionStart;
+    const end = el.selectionEnd;
+
+    const next = obfuscateURLs(el.value);
+    if (next === el.value) return;
+
+    el.value = next;
+    el.setSelectionRange(start, end);
+  };
+
+  document.addEventListener(
+    'input',
+    e => {
+      if (!isTextInput(e.target)) return;
+      if (e.inputType && !e.inputType.startsWith('insert')) return;
+      processValue(e.target);
+    },
+    true
+  );
+
+  document.addEventListener(
+    'paste',
+    e => {
+      if (!isTextInput(e.target)) return;
+
+      e.preventDefault();
+      const text = (e.clipboardData || window.clipboardData).getData('text');
+      document.execCommand('insertText', false, obfuscateURLs(text));
+    },
+    true
+  );
+})();
+
+(() => { // logo and reflink
+    'use strict';
+    function modifyLogo() {
+        const logoContainer = document.querySelector('._2Jlgl');
+        if (!logoContainer) return false;
+
+        const logoLink = logoContainer.querySelector('a');
+        if (!logoLink) return false;
+
+        logoLink.title = "You're using UtilifyV2 by Simon! Thank you!";
+        logoLink.href = "https://github.com/lappisu";
+
+        const logoImg = logoLink.querySelector('img');
+        if (!logoImg) return false;
+
+        logoImg.removeAttribute('srcset');
+        logoImg.src = "https://i.imgur.com/G3Y7IM8.jpeg";
+        logoImg.alt = "You're using UtilifyV2 by Simon! Thank you!";
+
+        logoImg.style.setProperty('object-fit', 'cover', 'important');
+        logoImg.style.setProperty('object-position', 'center', 'important');
+
+        return true;
+    }
+
+    if (modifyLogo()) return;
+
+    const observer = new MutationObserver(() => {
+        if (modifyLogo()) observer.disconnect();
+    });
+
+    observer.observe(document.body, {
+        childList: true,
+        subtree: true
+    });
+})();
+
+(() => { // Leaderboard Fix, Credits to Zpayer as the idea was his lol
+  const ENDPOINT_RE = /(^|https?:\/\/(?:www\.)?kogama\.com\/)(api\/leaderboard\/around_me\/)(\d+)(\/top\/?)(.*)$/i;
+  const PROFILE_PATH_RE = /^\/profile\/(\d+)\/leaderboard(\/|$)/i;
+
+  function getUidFromLocation() {
+    const m = location.pathname.match(PROFILE_PATH_RE);
+    return m ? m[1] : null;
+  }
+
+  function toAbsolute(urlLike) {
+    try {
+      return new URL(String(urlLike), location.href).toString();
+    } catch (e) {
+      return String(urlLike);
+    }
+  }
+
+  function rewriteLeaderboardUrl(urlLike) {
+    try {
+      const abs = toAbsolute(urlLike);
+      const parts = abs.match(ENDPOINT_RE);
+      const pageUid = getUidFromLocation();
+      if (!parts || !pageUid) return abs;
+      const prefix = parts[1].startsWith('/') ? location.origin + '/' : parts[1];
+      const rewritten = prefix + parts[2] + pageUid + parts[4] + (parts[5] || '');
+      return rewritten;
+    } catch (e) {
+      return toAbsolute(urlLike);
+    }
+  }
+
+  const nativeFetch = window.fetch.bind(window);
+  window.fetch = async function(input, init) {
+    try {
+      let originalRequest = null;
+      let urlStr = null;
+      if (input instanceof Request) {
+        originalRequest = input;
+        urlStr = originalRequest.url;
+      } else {
+        urlStr = String(input);
+      }
+      const rewritten = rewriteLeaderboardUrl(urlStr);
+      if (rewritten !== urlStr) {
+        if (originalRequest) {
+          const newReqInit = {
+            method: originalRequest.method,
+            headers: originalRequest.headers,
+            mode: originalRequest.mode,
+            credentials: originalRequest.credentials,
+            cache: originalRequest.cache,
+            redirect: originalRequest.redirect,
+            referrer: originalRequest.referrer,
+            referrerPolicy: originalRequest.referrerPolicy,
+            integrity: originalRequest.integrity,
+            keepalive: originalRequest.keepalive,
+            signal: originalRequest.signal
+          };
+          let body = null;
+          try {
+            const clone = originalRequest.clone();
+            body = await clone.arrayBuffer().then(buf => buf.byteLength ? buf : null).catch(() => null);
+          } catch (e) {
+            body = null;
+          }
+          if (body) newReqInit.body = body;
+          const newReq = new Request(rewritten, newReqInit);
+          return nativeFetch(newReq);
+        } else {
+          return nativeFetch(rewritten, init);
+        }
+      }
+      return nativeFetch(input, init);
+    } catch (e) {
+      return nativeFetch(input, init);
+    }
+  };
+
+  const XHROpen = XMLHttpRequest.prototype.open;
+  XMLHttpRequest.prototype.open = function(method, url, async, user, password) {
+    try {
+      const rewritten = rewriteLeaderboardUrl(url);
+      return XHROpen.call(this, method, rewritten, async === undefined ? true : async, user, password);
+    } catch (e) {
+      return XHROpen.call(this, method, url, async === undefined ? true : async, user, password);
+    }
+  };
+
+  function applyHighlightToUid(uid) {
+    if (!uid) return;
+    const prev = document.querySelector('tr._13LmU');
+    if (prev && prev.id !== uid + 'Row') prev.classList.remove('_13LmU');
+    const tr = document.getElementById(uid + 'Row');
+    if (tr && !tr.classList.contains('_13LmU')) tr.classList.add('_13LmU');
+  }
+
+  function installLocationChangeHook() {
+    const _push = history.pushState;
+    const _replace = history.replaceState;
+    history.pushState = function(...args) {
+      const rv = _push.apply(this, args);
+      window.dispatchEvent(new Event('locationchange'));
+      return rv;
+    };
+    history.replaceState = function(...args) {
+      const rv = _replace.apply(this, args);
+      window.dispatchEvent(new Event('locationchange'));
+      return rv;
+    };
+    window.addEventListener('popstate', () => window.dispatchEvent(new Event('locationchange')));
+  }
+
+  let observer;
+  function installObserver() {
+    if (observer) return;
+    observer = new MutationObserver(() => {
+      applyHighlightToUid(getUidFromLocation());
+    });
+    observer.observe(document.documentElement || document.body, { childList: true, subtree: true });
+  }
+
+  installLocationChangeHook();
+  window.addEventListener('locationchange', () => {
+    setTimeout(() => applyHighlightToUid(getUidFromLocation()), 50);
+  });
+
+  applyHighlightToUid(getUidFromLocation());
+  installObserver();
+})();
+
+// seamlesss desc cause looks better
+(function () {
+  "use strict";
+
+  const decodeHTML = s => {
+    const t = document.createElement("textarea");
+    t.innerHTML = s;
+    return t.value;
+  };
+
+  const decodeAll = s => {
+    if (!s) return "";
+    let out = s;
+    for (let i = 0; i < 3; i++) out = decodeHTML(out);
+    out = out.replace(/\\u([0-9a-fA-F]{4})/g, (_, h) => String.fromCharCode(parseInt(h, 16)));
+    out = out.replace(/\\n/g, "\n").replace(/\u2800/g, " ");
+    return out.trim();
+  };
+
+  const hookBootstrap = () => {
+    const wait = () => {
+      if (typeof window.kogamaApp !== "function") return requestAnimationFrame(wait);
+      const orig = window.kogamaApp;
+      window.kogamaApp = function (options) {
+        if (options?.bootstrap) window.__capturedBootstrap = options.bootstrap;
+        return orig.apply(this, arguments);
+      };
+    };
+    wait();
+  };
+
+  const waitDesc = () => new Promise(resolve => {
+    const check = () => {
+      const b = window.__capturedBootstrap;
+      const raw = b?.object?.description || b?.current_user?.description;
+      if (raw) resolve(decodeAll(raw));
+      else requestAnimationFrame(check);
+    };
+    check();
+  });
+
+  const removeReactBits = root => {
+    root.querySelectorAll('[itemprop="description"]').forEach(n => n.remove());
+    root.querySelectorAll(".MuiCollapse-root").forEach(n => n.remove());
+    root.querySelectorAll("button").forEach(b => {
+      if (/show more/i.test(b.textContent)) b.remove();
+    });
+  };
+
+  const buildBox = text => {
+    const box = document.createElement("div");
+    box.id = "tm-desc-box";
+    box.textContent = text;
+
+    box.style.overflowY = "auto";
+    box.style.whiteSpace = "pre-wrap";
+    box.style.wordBreak = "break-word";
+
+    box.style.color = "#a8adb3";
+    box.style.fontSize = "0.92em";
+    box.style.lineHeight = "1.45";
+
+    box.style.padding = "14px 16px 22px 16px";
+    box.style.marginTop = "6px";
+
+    box.style.background = "rgba(0,0,0,0.10)";
+    box.style.borderRadius = "8px";
+
+    box.style.scrollbarGutter = "stable";
+    box.style.overscrollBehavior = "contain";
+
+    return box;
+  };
+
+  const fitHeight = (box, host) => {
+    const parent = host.parentElement;
+    const h1 = parent ? parent.clientHeight : 0;
+    const h2 = window.innerHeight;
+
+    const limit = h1 > 0 ? Math.floor(h1 * 0.55) : Math.floor(h2 * 0.28);
+    box.style.maxHeight = limit + "px";
+  };
+
+  const guard = root => {
+    const mo = new MutationObserver(() => removeReactBits(root));
+    mo.observe(root, { childList: true, subtree: true });
+  };
+
+  const run = async () => {
+    const desc = await waitDesc();
+
+    const waitMount = () => {
+      const host = document.querySelector("div._1aUa_");
+      if (!host) return requestAnimationFrame(waitMount);
+      if (host.dataset.tmMounted) return;
+      host.dataset.tmMounted = "1";
+
+      host.style.height = "500px";
+      host.style.maxHeight = "auto";
+      host.style.overflow = "visible";
+
+      removeReactBits(host);
+      guard(host);
+
+      const box = buildBox(desc);
+      host.appendChild(box);
+      fitHeight(box, host);
+
+      new ResizeObserver(() => fitHeight(box, host)).observe(document.body);
+    };
+
+    waitMount();
+  };
+
+  hookBootstrap();
+  run();
+})();
+// Manage Feeds
+(function() {
+  'use strict';
+  
+  function getBootstrapData() {
+    const scripts = document.querySelectorAll('script');
+    for (const script of scripts) {
+      const text = script.textContent;
+      if (!text || !text.includes('options.bootstrap')) continue;
+      
+      try {
+        const match = text.match(/options\.bootstrap\s*=\s*({[\s\S]*?});/);
+        if (!match) continue;
+        
+        const data = Function(`"use strict"; return (${match[1]});`)();
+        return data?.object || null;
+      } catch {}
+    }
+    return null;
+  }
+
+  function shouldRun() {
+    const bootstrap = getBootstrapData();
+    if (!bootstrap) return false;
+    
+    if (!bootstrap.is_me || bootstrap.is_me !== true) return false;
+    
+    const userId = bootstrap.id;
+    if (!userId) return false;
+    
+    const urlPattern = new RegExp(`^https://www\\.kogama\\.com/profile/${userId}/?$`);
+    if (!urlPattern.test(window.location.href)) return false;
+    
+    return { userId, username: bootstrap.username };
+  }
+
+  const profileData = shouldRun();
+  if (!profileData) return;
+
+  const { userId, username } = profileData;
+
+  function injectStyles() {
+    const css = `
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-3px); }
+}
+
+/* Feed Manager Card Button */
+.feed-manager-card {
+  cursor: pointer !important;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  position: relative !important;
+  overflow: hidden !important;
+}
+
+.feed-manager-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, rgba(74, 222, 183, 0.05) 0%, rgba(42, 157, 143, 0.03) 100%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+
+.feed-manager-card:hover::before {
+  opacity: 1;
+}
+
+.feed-manager-card:hover {
+  transform: translateY(-4px) !important;
+  box-shadow: 0 8px 24px rgba(74, 222, 183, 0.2) !important;
+  border-color: rgba(74, 222, 183, 0.3) !important;
+}
+
+.feed-manager-card .MuiCardContent-root {
+  position: relative;
+  z-index: 1;
+}
+
+.feed-manager-card ._2fSqj {
+  color: #4adeb7 !important;
+  font-weight: 600 !important;
+}
+
+.feed-manager-card ._2LT6y {
+  color: #6ef0cb !important;
+}
+
+#feed-manager-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(6px);
+  z-index: 100000;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  animation: fadeIn 0.25s ease;
+}
+
+#feed-manager-overlay.visible {
+  display: flex;
+}
+
+#feed-manager-panel {
+  width: min(820px, 92vw);
+  max-height: 88vh;
+  background: linear-gradient(135deg, #0d1f1d 0%, #1a2f2d 50%, #0d1f1d 100%);
+  color: #e0f0ee;
+  border-radius: 12px;
+  box-shadow: 
+    0 0 40px rgba(74, 222, 183, 0.2),
+    0 20px 80px rgba(0, 0, 0, 0.7),
+    inset 0 1px 0 rgba(74, 222, 183, 0.15);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  border: 1px solid rgba(74, 222, 183, 0.25);
+  backdrop-filter: blur(20px);
+  animation: fadeIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+}
+
+#feed-manager-panel::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 180px;
+  height: 180px;
+  background: radial-gradient(circle at top right, rgba(74, 222, 183, 0.15) 0%, transparent 60%);
+  border-radius: 0 12px 0 0;
+  pointer-events: none;
+}
+
+#feed-manager-panel::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 180px;
+  height: 180px;
+  background: radial-gradient(circle at bottom left, rgba(42, 157, 143, 0.1) 0%, transparent 60%);
+  pointer-events: none;
+}
+
+#feed-manager-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 24px;
+  border-bottom: 1px solid rgba(74, 222, 183, 0.12);
+  background: linear-gradient(135deg, rgba(20, 35, 33, 0.85) 0%, rgba(15, 28, 26, 0.95) 100%);
+  position: relative;
+}
+
+#feed-manager-header::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 5%;
+  right: 5%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent 0%, rgba(74, 222, 183, 0.4) 50%, transparent 100%);
+}
+
+#feed-manager-title {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 3px;
+  color: rgba(74, 222, 183, 0.7);
+  text-transform: uppercase;
+  position: relative;
+}
+
+#feed-manager-title::before,
+#feed-manager-title::after {
+  content: '◆';
+  position: absolute;
+  color: rgba(74, 222, 183, 0.5);
+  font-size: 8px;
+}
+
+#feed-manager-title::before { left: -20px; }
+#feed-manager-title::after { right: -20px; }
+
+.header-controls {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.fm-btn {
+  padding: 9px 18px;
+  background: linear-gradient(135deg, rgba(74, 222, 183, 0.18) 0%, rgba(42, 157, 143, 0.12) 100%);
+  color: #4adeb7;
+  border-radius: 8px;
+  border: 1px solid rgba(74, 222, 183, 0.35);
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 13px;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.fm-btn::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+  transform: translate(-50%, -50%);
+  transition: width 0.3s ease, height 0.3s ease;
+}
+
+.fm-btn:hover::before {
+  width: 300px;
+  height: 300px;
+}
+
+.fm-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(74, 222, 183, 0.3);
+  border-color: rgba(74, 222, 183, 0.6);
+}
+
+.fm-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.fm-btn-close {
+  background: rgba(74, 222, 183, 0.08);
+  border: 1px solid rgba(74, 222, 183, 0.2);
+  color: #4adeb7;
+  padding: 8px 14px;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.fm-btn-close:hover {
+  background: rgba(74, 222, 183, 0.15);
+  border-color: rgba(74, 222, 183, 0.4);
+  color: #6ef0cb;
+}
+
+#feed-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+  background: linear-gradient(180deg, rgba(13, 23, 21, 0.95) 0%, rgba(10, 18, 16, 0.98) 100%);
+  position: relative;
+}
+
+#feed-content::after {
+  content: 'Made by Simon';
+  position: absolute;
+  right: 12px;
+  bottom: 20px;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  font-size: 10px;
+  letter-spacing: 2.5px;
+  color: rgba(74, 222, 183, 0.35);
+  font-weight: 500;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+
+.feed-item {
+  background: linear-gradient(135deg, rgba(74, 222, 183, 0.04) 0%, rgba(42, 157, 143, 0.02) 100%);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(74, 222, 183, 0.08);
+  padding: 18px;
+  border-radius: 10px;
+  margin-bottom: 14px;
+  transition: all 0.25s ease;
+  animation: slideUp 0.3s ease;
+  position: relative;
+}
+
+.feed-item:hover {
+  background: linear-gradient(135deg, rgba(74, 222, 183, 0.08) 0%, rgba(42, 157, 143, 0.04) 100%);
+  border-color: rgba(74, 222, 183, 0.2);
+  transform: translateY(-3px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
+}
+
+.feed-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.feed-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: #a0c8c0;
+}
+
+.feed-date {
+  color: rgba(74, 222, 183, 0.7);
+}
+
+.feed-type-badge {
+  display: inline-block;
+  padding: 5px 12px;
+  background: linear-gradient(135deg, rgba(74, 222, 183, 0.15), rgba(42, 157, 143, 0.1));
+  border: 1px solid rgba(74, 222, 183, 0.3);
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #4adeb7;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 12px;
+}
+
+.feed-text {
+  color: #e0f0ee;
+  line-height: 1.7;
+  margin-bottom: 12px;
+  word-wrap: break-word;
+}
+
+.feed-text a {
+  color: #4adeb7;
+  text-decoration: none;
+  transition: all 0.15s ease;
+}
+
+.feed-text a:hover {
+  color: #6ef0cb;
+  text-decoration: underline;
+}
+
+.feed-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.feed-btn {
+  padding: 7px 14px;
+  font-size: 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(74, 222, 183, 0.15);
+  background: rgba(0, 0, 0, 0.4);
+  color: #b8d8d0;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.feed-btn:hover {
+  background: rgba(74, 222, 183, 0.1);
+  border-color: rgba(74, 222, 183, 0.35);
+  color: #4adeb7;
+  transform: translateY(-1px);
+}
+
+.feed-btn-delete {
+  background: rgba(239, 71, 111, 0.1);
+  border-color: rgba(239, 71, 111, 0.3);
+  color: #ef476f;
+}
+
+.feed-btn-delete:hover {
+  background: rgba(239, 71, 111, 0.2);
+  border-color: rgba(239, 71, 111, 0.5);
+}
+
+.comments-section {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(74, 222, 183, 0.08);
+}
+
+.comment-item {
+  background: rgba(0, 0, 0, 0.3);
+  padding: 12px;
+  border-radius: 8px;
+  margin-bottom: 10px;
+  font-size: 13px;
+  color: #b8d8d0;
+  border: 1px solid rgba(74, 222, 183, 0.08);
+  transition: all 0.2s ease;
+}
+
+.comment-item:hover {
+  background: rgba(0, 0, 0, 0.4);
+  border-color: rgba(74, 222, 183, 0.15);
+}
+
+.comment-author {
+  font-weight: 600;
+  color: #4adeb7;
+  margin-bottom: 6px;
+}
+
+.comment-delete-btn {
+  background: rgba(239, 71, 111, 0.12);
+  border: 1px solid rgba(239, 71, 111, 0.3);
+  color: #ef476f;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  padding: 0;
+}
+
+.comment-delete-btn:hover {
+  background: rgba(239, 71, 111, 0.25);
+  border-color: rgba(239, 71, 111, 0.5);
+  transform: scale(1.15);
+}
+
+.loading-msg {
+  text-align: center;
+  padding: 50px 20px;
+  color: rgba(74, 222, 183, 0.5);
+  font-size: 14px;
+}
+
+.empty-msg {
+  text-align: center;
+  padding: 70px 20px;
+  color: rgba(74, 222, 183, 0.4);
+  font-size: 14px;
+  font-style: italic;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(74, 222, 183, 0.35) 0%, rgba(42, 157, 143, 0.35) 100%);
+  border-radius: 5px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, rgba(74, 222, 183, 0.55) 0%, rgba(42, 157, 143, 0.55) 100%);
+  background-clip: padding-box;
+}
+`;
+
+    const style = document.createElement('style');
+    style.textContent = css;
+    document.head.appendChild(style);
+  }
+
+  function createCardButton() {
+    const checkContainer = setInterval(() => {
+      const container = document.querySelector('.CgH1-');
+      if (!container) return;
+      if (container.querySelector('.feed-manager-card')) return;
+      
+      clearInterval(checkContainer);
+      
+      const card = document.createElement('div');
+      card.className = 'MuiPaper-root MuiPaper-elevation MuiPaper-rounded MuiPaper-elevation1 MuiCard-root _2Hovk feed-manager-card css-wog98n';
+      card.style.cssText = '--Paper-shadow: 0px 2px 1px -1px rgba(0,0,0,0.2),0px 1px 1px 0px rgba(0,0,0,0.14),0px 1px 3px 0px rgba(0,0,0,0.12); --Paper-overlay: linear-gradient(rgba(255, 255, 255, 0.051), rgba(255, 255, 255, 0.051));';
+      
+      card.innerHTML = `
+        <div class="MuiCardContent-root _1l7RM css-15q2cw4">
+          <div class="_2fSqj">Manage Feed</div>
+          <div class="_2LT6y">◆</div>
+        </div>
+      `;
+      
+      card.addEventListener('click', () => openPanel());
+      
+      container.insertBefore(card, container.firstChild);
+    }, 100);
+  }
+
+  function createPanel() {
+    const overlay = document.createElement('div');
+    overlay.id = 'feed-manager-overlay';
+    
+    overlay.innerHTML = `
+      <div id="feed-manager-panel">
+        <div id="feed-manager-header">
+          <div id="feed-manager-title">Feed Manager</div>
+          
+          <div class="header-controls">
+            <button class="fm-btn" id="fm-delete-all">Delete All</button>
+            <button class="fm-btn fm-btn-close" id="fm-close">×</button>
+          </div>
+        </div>
+        
+        <div id="feed-content">
+          <div class="loading-msg">Loading feed...</div>
+        </div>
+      </div>
+    `;
+    
+    document.body.appendChild(overlay);
+    
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) closePanel();
+    });
+    
+    document.getElementById('fm-close').addEventListener('click', closePanel);
+    document.getElementById('fm-delete-all').addEventListener('click', deleteAllPosts);
+    
+    return overlay;
+  }
+
+  let panel = null;
+  let feedData = [];
+  let isLoading = false;
+  let currentPage = 1;
+  let hasMore = true;
+
+  function openPanel() {
+    if (!panel) panel = createPanel();
+    panel.classList.add('visible');
+    loadFeed();
+  }
+
+  function closePanel() {
+    if (panel) panel.classList.remove('visible');
+  }
+
+  async function loadFeed(page = 1) {
+    if (isLoading || (!hasMore && page > 1)) return;
+    
+    isLoading = true;
+    const content = document.getElementById('feed-content');
+    
+    if (page === 1) {
+      content.innerHTML = '<div class="loading-msg">Loading feed...</div>';
+      feedData = [];
+      currentPage = 1;
+      hasMore = true;
+    }
+    
+    try {
+      const res = await fetch(`https://www.kogama.com/api/feed/${userId}/?page=${page}&count=20`, {
+        method: 'GET',
+        credentials: 'omit',
+        headers: { 'Accept': 'application/json' },
+        cache: 'no-store'
+      });
+      
+      if (!res.ok) throw new Error('Failed to load');
+      
+      const data = await res.json();
+      let items = [];
+      
+      if (Array.isArray(data)) items = data;
+      else if (Array.isArray(data?.feed)) items = data.feed;
+      else if (Array.isArray(data?.data)) items = data.data;
+      
+      if (items.length === 0) {
+        hasMore = false;
+        if (page === 1) {
+          content.innerHTML = '<div class="empty-msg">No feed posts found.</div>';
+        }
+      } else {
+        feedData.push(...items);
+        renderFeed();
+        currentPage = page;
+      }
+    } catch (err) {
+      content.innerHTML = '<div class="empty-msg">Failed to load feed.</div>';
+      console.error('Feed load error:', err);
+    } finally {
+      isLoading = false;
+    }
+  }
+
+  function renderFeed() {
+    const content = document.getElementById('feed-content');
+    content.innerHTML = '';
+    
+    feedData.forEach((item, index) => {
+      const feedItem = createFeedItem(item, index);
+      content.appendChild(feedItem);
+    });
+    
+    // Infinite scroll
+    const sentinel = document.createElement('div');
+    sentinel.style.height = '1px';
+    content.appendChild(sentinel);
+    
+    const observer = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting && hasMore && !isLoading) {
+        loadFeed(currentPage + 1);
+      }
+    });
+    
+    observer.observe(sentinel);
+  }
+
+  function formatTimeAgo(dateString) {
+    if (!dateString) return 'Unknown time';
+    
+    const date = new Date(dateString);
+    const now = new Date();
+    const seconds = Math.floor((now - date) / 1000);
+    
+    if (seconds < 60) return 'Just now';
+    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+    if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+    if (seconds < 604800) return `${Math.floor(seconds / 86400)}d ago`;
+    if (seconds < 2592000) return `${Math.floor(seconds / 604800)}w ago`;
+    
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+
+  function parseFeedData(item) {
+    const feedType = item.feed_type || 'status_updated';
+    let data = {};
+    
+    try {
+      if (item._data && typeof item._data === 'string') {
+        data = JSON.parse(item._data);
+      } else if (item.data) {
+        data = item.data;
+      }
+    } catch {
+      data = item.data || {};
+    }
+    
+    return { feedType, data };
+  }
+
+  function renderFeedContent(item) {
+    const { feedType, data } = parseFeedData(item);
+    
+    const youtubeMatch = (data.status_message || '').match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)/);
+    
+    if (youtubeMatch) {
+      return `
+        <div class="feed-type-badge">Shared a video</div>
+        <div class="feed-text">
+          <a href="https://youtube.com/watch?v=${youtubeMatch[1]}" target="_blank" rel="noopener" style="color:#4adeb7;">
+            🎥 YouTube Video
+          </a>
+        </div>
+      `;
+    }
+    
+    switch (feedType) {
+      case 'marketplace_buy':
+        const productName = data.product_name || 'Unknown Item';
+        const productId = data.product_id || '';
+        const creditorName = data.creditor_username || 'Unknown';
+        const creditorId = data.creditor_profile_id || '';
+        
+        return `
+          <div class="feed-type-badge">Marketplace Purchase</div>
+          <div class="feed-text">
+            Purchased <a href="https://www.kogama.com/marketplace/avatar/${productId}/" target="_blank" rel="noopener" style="color:#4adeb7;">${escapeHtml(productName)}</a>
+            ${creditorId ? `from <a href="https://www.kogama.com/profile/${creditorId}/" target="_blank" rel="noopener" style="color:#6ef0cb;">${escapeHtml(creditorName)}</a>` : ''}
+          </div>
+        `;
+        
+      case 'badge_earned':
+        const badgeName = item.badge_name || 'Unknown Badge';
+        return `
+          <div class="feed-type-badge">Badge Earned</div>
+          <div class="feed-text">
+            🏆 Earned the <span style="color:#4adeb7; font-weight:600;">${escapeHtml(badgeName)}</span> badge
+          </div>
+        `;
+        
+      case 'wall_post':
+        const authorName = item.profile_username || 'Someone';
+        const authorId = item.profile_id || '';
+        const message = data.status_message || '';
+        
+        return `
+          <div class="feed-type-badge">Wall Post</div>
+          <div class="feed-text">
+            <a href="https://www.kogama.com/profile/${authorId}/" target="_blank" rel="noopener" style="color:#6ef0cb; font-weight:600;">${escapeHtml(authorName)}</a> posted:
+            <div style="margin-top:8px; padding-left:12px; border-left:2px solid rgba(74, 222, 183, 0.3);">${escapeHtml(message)}</div>
+          </div>
+        `;
+        
+      case 'status_updated':
+      default:
+        const statusMessage = data.status_message || data.message || item.message || 'No content';
+        return `
+          <div class="feed-type-badge">Status Update</div>
+          <div class="feed-text">${escapeHtml(statusMessage)}</div>
+        `;
+    }
+  }
+
+  function createFeedItem(item, index) {
+    const div = document.createElement('div');
+    div.className = 'feed-item';
+    div.dataset.feedId = item.id;
+    div.style.animationDelay = `${index * 0.05}s`;
+    
+    const timeAgo = formatTimeAgo(item.created);
+    const fullDate = item.created ? new Date(item.created).toLocaleString('en-US', { 
+      month: 'short', 
+      day: 'numeric', 
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    }) : 'Unknown date';
+    
+    div.innerHTML = `
+      <div class="feed-header">
+        <div class="feed-meta">
+          <span class="feed-date" title="${fullDate}">${timeAgo}</span>
+        </div>
+      </div>
+      ${renderFeedContent(item)}
+      <div class="feed-actions">
+        <button class="feed-btn feed-btn-comments" data-feed-id="${item.id}">
+          View Comments
+        </button>
+        <button class="feed-btn feed-btn-delete" data-feed-id="${item.id}">
+          Delete Post
+        </button>
+      </div>
+      <div class="comments-section" id="comments-${item.id}" style="display:none;"></div>
+    `;
+    
+    div.querySelector('.feed-btn-comments').addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleComments(item.id);
+    });
+    div.querySelector('.feed-btn-delete').addEventListener('click', (e) => {
+      e.stopPropagation();
+      deletePost(item.id);
+    });
+    
+    return div;
+  }
+
+  async function toggleComments(feedId) {
+    const section = document.getElementById(`comments-${feedId}`);
+    const btn = document.querySelector(`.feed-btn-comments[data-feed-id="${feedId}"]`);
+    
+    if (section.style.display === 'none') {
+      section.innerHTML = '<div class="loading-msg" style="padding:20px;">Loading comments...</div>';
+      section.style.display = 'block';
+      
+      try {
+        const res = await fetch(`https://www.kogama.com/api/feed/${feedId}/comment/?count=50`, {
+          method: 'GET',
+          credentials: 'include'
+        });
+        
+        const data = await res.json();
+        const comments = Array.isArray(data?.data) ? data.data : [];
+        
+        if (comments.length === 0) {
+          section.innerHTML = '<div class="empty-msg" style="padding:20px;">No comments</div>';
+        } else {
+          section.innerHTML = '';
+          comments.forEach(comment => {
+            const timeAgo = formatTimeAgo(comment.created);
+            
+            let commentText = '';
+            try {
+              if (comment._data && typeof comment._data === 'string') {
+                const parsed = JSON.parse(comment._data);
+                commentText = parsed.data || parsed.message || '';
+              }
+            } catch {
+              commentText = comment.message || '';
+            }
+            
+            const div = document.createElement('div');
+            div.className = 'comment-item';
+            div.dataset.commentId = comment.id;
+            div.innerHTML = `
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                <div class="comment-author">${escapeHtml(comment.profile_username || 'Unknown')}</div>
+                <div style="display:flex; align-items:center; gap:8px;">
+                  <div style="font-size:11px; color:rgba(74, 222, 183, 0.5);">${timeAgo}</div>
+                  ${comment.can_delete ? `<button class="comment-delete-btn" data-comment-id="${comment.id}" data-feed-id="${feedId}" title="Delete comment">×</button>` : ''}
+                </div>
+              </div>
+              <div>${escapeHtml(commentText)}</div>
+            `;
+            
+            if (comment.can_delete) {
+              div.querySelector('.comment-delete-btn').addEventListener('click', (e) => {
+                e.stopPropagation();
+                deleteComment(feedId, comment.id);
+              });
+            }
+            
+            section.appendChild(div);
+          });
+        }
+        
+        btn.textContent = 'Hide Comments';
+      } catch (err) {
+        section.innerHTML = '<div class="empty-msg" style="padding:20px;">Failed to load comments</div>';
+        console.error('Comments load error:', err);
+      }
+    } else {
+      section.style.display = 'none';
+      section.innerHTML = '';
+      btn.textContent = 'View Comments';
+    }
+  }
+
+  async function deleteComment(feedId, commentId) {
+    const commentEl = document.querySelector(`.comment-item[data-comment-id="${commentId}"]`);
+    if (!commentEl) return;
+    
+    if (!confirm('Delete this comment?')) return;
+    
+    try {
+      await fetch(`https://www.kogama.com/api/feed/${feedId}/comment/${commentId}/`, {
+        method: 'DELETE',
+        credentials: 'include'
+      });
+      
+      commentEl.style.opacity = '0';
+      commentEl.style.transform = 'translateX(-10px)';
+      setTimeout(() => {
+        commentEl.remove();
+        
+        const section = document.getElementById(`comments-${feedId}`);
+        if (section && section.querySelectorAll('.comment-item').length === 0) {
+          section.innerHTML = '<div class="empty-msg" style="padding:20px;">No comments</div>';
+        }
+      }, 200);
+    } catch (err) {
+      alert('Failed to delete comment');
+      console.error('Comment delete error:', err);
+    }
+  }
+
+  async function deletePost(feedId) {
+    const item = document.querySelector(`[data-feed-id="${feedId}"]`).closest('.feed-item');
+    if (!item) return;
+    
+    if (!confirm('Delete this post?')) return;
+    
+    try {
+      await fetch(`https://www.kogama.com/api/feed/${userId}/${feedId}/`, {
+        method: 'DELETE',
+        credentials: 'include'
+      });
+      
+      item.style.opacity = '0';
+      item.style.transform = 'translateX(-20px)';
+      setTimeout(() => {
+        item.remove();
+        feedData = feedData.filter(f => f.id !== feedId);
+        if (feedData.length === 0) {
+          document.getElementById('feed-content').innerHTML = '<div class="empty-msg">No feed posts found.</div>';
+        }
+      }, 200);
+    } catch (err) {
+      alert('Failed to delete post');
+      console.error('Delete error:', err);
+    }
+  }
+
+  async function deleteAllPosts() {
+    if (!confirm(`Delete all ${feedData.length} posts? This cannot be undone.`)) return;
+    
+    const btn = document.getElementById('fm-delete-all');
+    btn.disabled = true;
+    btn.textContent = 'Deleting...';
+    
+    let deleted = 0;
+    for (const item of feedData) {
+      try {
+        await fetch(`https://www.kogama.com/api/feed/${userId}/${item.id}/`, {
+          method: 'DELETE',
+          credentials: 'include'
+        });
+        deleted++;
+        btn.textContent = `Deleted ${deleted}/${feedData.length}`;
+        await new Promise(r => setTimeout(r, 500));
+      } catch (err) {
+        console.error('Delete error:', err);
+      }
+    }
+    
+    btn.textContent = 'Delete All';
+    btn.disabled = false;
+    feedData = [];
+    document.getElementById('feed-content').innerHTML = '<div class="empty-msg">All posts deleted.</div>';
+  }
+
+  function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
+  injectStyles();
+  createCardButton();
+})();
+
+// Update Checker
+(function() {
+  'use strict';
+  
+  const UPDATE_CHECK_URL = 'https://raw.githubusercontent.com/lappisu/Utilify/refs/heads/main/Script/Rewrite/Utilify.user.js';
+  const INSTALL_URL = 'https://github.com/lappisu/Utilify/raw/refs/heads/main/Script/Rewrite/Utilify.user.js';
+  const CHECK_INTERVAL = 24 * 60 * 60 * 1000; // 24 hours
+  const STORAGE_KEY = 'utilify_last_update_check';
+
+  function injectStyles() {
+    if (document.getElementById('update-checker-style')) return;
+    
+    const css = `
+      @keyframes float-in {
+        from { 
+          opacity: 0; 
+          transform: translate(-50%, -30px) scale(0.92);
+        }
+        to { 
+          opacity: 1; 
+          transform: translate(-50%, 0) scale(1);
+        }
+      }
+      
+      @keyframes shimmer-glow {
+        0%, 100% { 
+          box-shadow: 
+            0 8px 32px rgba(74, 222, 183, 0.3),
+            0 0 60px rgba(74, 222, 183, 0.15),
+            inset 0 1px 0 rgba(74, 222, 183, 0.3);
+        }
+        50% { 
+          box-shadow: 
+            0 8px 32px rgba(74, 222, 183, 0.5),
+            0 0 80px rgba(74, 222, 183, 0.25),
+            inset 0 1px 0 rgba(74, 222, 183, 0.4);
+        }
+      }
+      
+      @keyframes pulse-icon {
+        0%, 100% { transform: scale(1); opacity: 0.8; }
+        50% { transform: scale(1.1); opacity: 1; }
+      }
+      
+      .update-notification {
+        position: fixed;
+        top: 24px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 999999;
+        padding: 18px 26px;
+        background: linear-gradient(135deg, #0d1f1d 0%, #1a2f2d 50%, #0d1f1d 100%);
+        backdrop-filter: blur(16px);
+        border: 1px solid rgba(74, 222, 183, 0.3);
+        border-radius: 12px;
+        animation: 
+          float-in 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards,
+          shimmer-glow 3s ease-in-out infinite;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        max-width: 460px;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        position: relative;
+      }
+      
+      .update-notification::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: 150px;
+        height: 150px;
+        background: radial-gradient(circle at top right, rgba(74, 222, 183, 0.12) 0%, transparent 60%);
+        border-radius: 0 12px 0 0;
+        pointer-events: none;
+      }
+      
+      .update-notification::after {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: 1px;
+        background: linear-gradient(90deg, transparent 0%, rgba(74, 222, 183, 0.4) 50%, transparent 100%);
+      }
+      
+      .update-icon {
+        font-size: 32px;
+        color: #4adeb7;
+        animation: pulse-icon 2.5s ease-in-out infinite;
+        flex-shrink: 0;
+        filter: drop-shadow(0 0 8px rgba(74, 222, 183, 0.5));
+        z-index: 1;
+      }
+      
+      .update-content {
+        flex: 1;
+        z-index: 1;
+      }
+      
+      .update-title {
+        font-size: 15px;
+        font-weight: 600;
+        color: #4adeb7;
+        margin-bottom: 5px;
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
+        font-size: 12px;
+      }
+      
+      .update-message {
+        font-size: 14px;
+        color: #e0f0ee;
+        line-height: 1.5;
+      }
+      
+      .update-version {
+        font-weight: 600;
+        color: #6ef0cb;
+        background: rgba(74, 222, 183, 0.1);
+        padding: 2px 8px;
+        border-radius: 4px;
+        border: 1px solid rgba(74, 222, 183, 0.2);
+      }
+      
+      .update-actions {
+        display: flex;
+        gap: 10px;
+        flex-shrink: 0;
+        z-index: 1;
+      }
+      
+      .update-btn {
+        padding: 9px 18px;
+        border-radius: 8px;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        text-decoration: none;
+        display: inline-block;
+        border: none;
+        position: relative;
+        overflow: hidden;
+      }
+      
+      .update-btn::before {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 0;
+        height: 0;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.15);
+        transform: translate(-50%, -50%);
+        transition: width 0.3s ease, height 0.3s ease;
+      }
+      
+      .update-btn:hover::before {
+        width: 300px;
+        height: 300px;
+      }
+      
+      .update-btn-primary {
+        background: linear-gradient(135deg, rgba(74, 222, 183, 0.2) 0%, rgba(42, 157, 143, 0.15) 100%);
+        color: #4adeb7;
+        border: 1px solid rgba(74, 222, 183, 0.4);
+        box-shadow: 0 3px 10px rgba(74, 222, 183, 0.2);
+      }
+      
+      .update-btn-primary:hover {
+        background: linear-gradient(135deg, rgba(74, 222, 183, 0.3) 0%, rgba(42, 157, 143, 0.25) 100%);
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(74, 222, 183, 0.35);
+        border-color: rgba(74, 222, 183, 0.6);
+      }
+      
+      .update-btn-secondary {
+        background: rgba(74, 222, 183, 0.08);
+        color: #b8d8d0;
+        border: 1px solid rgba(74, 222, 183, 0.2);
+      }
+      
+      .update-btn-secondary:hover {
+        background: rgba(74, 222, 183, 0.15);
+        color: #d0ede5;
+        transform: translateY(-1px);
+        border-color: rgba(74, 222, 183, 0.35);
+      }
+      
+      .update-close {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        width: 26px;
+        height: 26px;
+        border-radius: 50%;
+        background: rgba(74, 222, 183, 0.1);
+        border: 1px solid rgba(74, 222, 183, 0.2);
+        color: #4adeb7;
+        font-size: 18px;
+        line-height: 1;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s ease;
+        z-index: 2;
+      }
+      
+      .update-close:hover {
+        background: rgba(74, 222, 183, 0.2);
+        border-color: rgba(74, 222, 183, 0.4);
+        transform: scale(1.1);
+      }
+      
+      .update-notification.dismissing {
+        opacity: 0;
+        transform: translate(-50%, -30px) scale(0.92);
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+    `;
+    
+    const style = document.createElement('style');
+    style.id = 'update-checker-style';
+    style.textContent = css;
+    document.head.appendChild(style);
+  }
+
+  function getInstalledVersion() {
+    try {
+      if (typeof GM_info !== 'undefined' && GM_info?.script?.version) {
+        return GM_info.script.version;
+      }
+    } catch {}
+    return null;
+  }
+  
+  function parseVersion(versionString) {
+    if (!versionString) return [0, 0, 0];
+    const parts = versionString.split('.').map(n => parseInt(n) || 0);
+    while (parts.length < 3) parts.push(0);
+    return parts;
+  }
+  
+  function compareVersions(current, remote) {
+    const c = parseVersion(current);
+    const r = parseVersion(remote);
+    
+    for (let i = 0; i < 3; i++) {
+      if (r[i] > c[i]) return 1; // Remote is newer
+      if (r[i] < c[i]) return -1; // Current is newer
+    }
+    return 0;
+  }
+
+  async function fetchRemoteVersion() {
+    try {
+      const response = await fetch(UPDATE_CHECK_URL, {
+        method: 'GET',
+        cache: 'no-store',
+        headers: {
+          'Accept': 'text/plain'
+        }
+      });
+      
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      
+      const text = await response.text();
+      const match = text.match(/@version\s+([^\s\n]+)/);
+      
+      return match ? match[1].trim() : null;
+    } catch (err) {
+      console.error('Utilify Update Check: Failed to fetch remote version', err);
+      return null;
+    }
+  }
+
+  function dismissNotification(notification) {
+    notification.classList.add('dismissing');
+    setTimeout(() => notification.remove(), 300);
+  }
+
+  function showUpdateNotification(currentVersion, remoteVersion) {
+    document.querySelectorAll('.update-notification').forEach(n => dismissNotification(n));
+    
+    const notification = document.createElement('div');
+    notification.className = 'update-notification';
+    
+    notification.innerHTML = `
+      <button class="update-close" aria-label="Dismiss">×</button>
+      <div class="update-icon">◆</div>
+      <div class="update-content">
+        <div class="update-title">◆ Update Available ◆</div>
+        <div class="update-message">
+          <span class="update-version">v${remoteVersion}</span> is ready to install
+          ${currentVersion ? ` · Current: v${currentVersion}` : ''}
+        </div>
+      </div>
+      <div class="update-actions">
+        <a href="${INSTALL_URL}" class="update-btn update-btn-primary" target="_blank" rel="noopener">
+          Update Now
+        </a>
+        <button class="update-btn update-btn-secondary" id="update-dismiss">
+          Later
+        </button>
+      </div>
+    `;
+    
+    document.body.appendChild(notification);
+    
+    notification.querySelector('.update-close').addEventListener('click', () => {
+      dismissNotification(notification);
+    });
+    
+    notification.querySelector('#update-dismiss').addEventListener('click', () => {
+      dismissNotification(notification);
+    });
+    
+    // Auto-dismiss after 45 seconds
+    setTimeout(() => {
+      if (notification.parentNode) {
+        dismissNotification(notification);
+      }
+    }, 45000);
+  }
+
+  function shouldCheckForUpdates() {
+    try {
+      const lastCheck = localStorage.getItem(STORAGE_KEY);
+      if (!lastCheck) return true;
+      
+      const lastCheckTime = parseInt(lastCheck);
+      const now = Date.now();
+      
+      return (now - lastCheckTime) >= CHECK_INTERVAL;
+    } catch {
+      return true;
+    }
+  }
+  
+  function updateLastCheckTime() {
+    try {
+      localStorage.setItem(STORAGE_KEY, Date.now().toString());
+    } catch {}
+  }
+  
+  async function checkForUpdates(force = false) {
+    if (!force && !shouldCheckForUpdates()) {
+      console.log('Utilify Update Check: Skipped (checked recently)');
+      return;
+    }
+    
+    console.log('Utilify Update Check: Starting...');
+    
+    const currentVersion = getInstalledVersion();
+    if (!currentVersion) {
+      console.log('Utilify Update Check: Cannot determine installed version');
+      return;
+    }
+    
+    const remoteVersion = await fetchRemoteVersion();
+    if (!remoteVersion) {
+      console.log('Utilify Update Check: Failed to fetch remote version');
+      return;
+    }
+    
+    console.log(`Utilify Update Check: Current v${currentVersion}, Remote v${remoteVersion}`);
+    
+    const comparison = compareVersions(currentVersion, remoteVersion);
+    
+    if (comparison > 0) {
+      console.log('Utilify Update Check: Update available!');
+      showUpdateNotification(currentVersion, remoteVersion);
+    } else if (comparison === 0) {
+      console.log('Utilify Update Check: Up to date ✓');
+    } else {
+      console.log('Utilify Update Check: Local version is newer (dev build?)');
+    }
+    
+    updateLastCheckTime();
+  }
+
+  // Expose API for manual checks
+  window.UtilifyUpdateChecker = {
+    check: () => checkForUpdates(true),
+    getVersion: getInstalledVersion,
+    checkUrl: UPDATE_CHECK_URL,
+    installUrl: INSTALL_URL
+  };
+
+  function init() {
+    injectStyles();
+    setTimeout(() => checkForUpdates(), 3000);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();
