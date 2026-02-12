@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         UtilifyV2
-// @namespace    wee woo wee woo
-// @version      2.3.1
-// @description  A rewrite of previous niche adaptation with goal to enhance visuals & experience
+// @name         Utilify 
+// @namespace    author @ simonvs (UID: 970332627221504081)
+// @version      3.0.0
+// @description  (Almost) personal userscript inspired by KoGaMaBuddy containing various utilities and visual enhancements. 
 // @author       Simon
 // @match        *://www.kogama.com/*
 // @icon         https://avatars.githubusercontent.com/u/143356794?v=4
@@ -16,6 +16,7 @@
 // @connect      kogama.com
 // @run-at       document-start
 // ==/UserScript==
+
 // CSS: Custom Layouts and improvements
 (() => {
     const style = document.createElement("style");
@@ -1893,71 +1894,136 @@
         }
       },
 
-      async renderPlayerChip(el) {
-        if (!el) return;
-        try {
-          const res = await fetch(location.href);
-          const html = await res.text();
-          const m = html.match(/playing_now_members["']\s*:\s*(\d+).*?playing_now_tourists["']\s*:\s*(\d+)/s);
-          const counts = m ? { members: +m[1], tourists: +m[2] } : { members: 0, tourists: 0 };
-          
-          el.innerHTML = '';
-          el.style.cssText = `
-            background: linear-gradient(135deg, rgba(74, 222, 183, 0.15), rgba(42, 157, 143, 0.1));
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(74, 222, 183, 0.25);
-            border-radius: 10px;
-            padding: 9px 18px;
-            display: inline-flex;
-            align-items: center;
-            gap: 14px;
-            color: #e0f0ee;
-            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
-            font-size: 13px;
-          `;
-
-          const total = counts.members + counts.tourists;
-          el.innerHTML = `
-            <span style="font-weight:600; color:#4adeb7;">Global: ${total}</span>
-            <span style="color:#6ef0cb;">Players: ${counts.members}</span>
-            <span style="color:#a0c8c0;">Tourists: ${counts.tourists}</span>
-          `;
-        } catch {}
-      },
-
-      enablePlayerTypeDisplay() {
-        if (!location.pathname.includes('/games/play/')) return;
-        if (this.playerType.attached) return;
-
-        const selectors = ['.MuiChip-colorPrimary', '.PlayerCountChip', '[data-player-chip]'];
-        const findAndRender = () => {
-          for (const sel of selectors) {
-            const chip = document.querySelector(sel);
-            if (chip) {
-              this.renderPlayerChip(chip);
-              this.playerType.attached = true;
-              return true;
-            }
-          }
-          return false;
-        };
-
-        if (findAndRender()) return;
-
-        const mo = new MutationObserver(() => {
-          if (findAndRender()) mo.disconnect();
-        });
-        mo.observe(document.body, { childList: true, subtree: true });
-        this.playerType.observer = mo;
-      },
-
-      disablePlayerTypeDisplay() {
-        if (this.playerType.observer) {
-          this.playerType.observer.disconnect();
-          this.playerType.observer = null;
+    async renderPlayerChip(el) {
+    if (!el) return;
+    try {
+        const res = await fetch(location.href);
+        const html = await res.text();
+        const m = html.match(/playing_now_members["']\s*:\s*(\d+).*?playing_now_tourists["']\s*:\s*(\d+)/s);
+        const counts = m ? { members: +m[1], tourists: +m[2] } : { members: 0, tourists: 0 };
+        
+        // Remove existing chip if present
+        const existingChip = document.querySelector('[data-player-stats-chip]');
+        if (existingChip) existingChip.remove();
+        
+        const total = counts.members + counts.tourists;
+        
+        const chip = document.createElement('div');
+        chip.setAttribute('data-player-stats-chip', 'true');
+        chip.style.cssText = `
+        background: linear-gradient(135deg, rgba(20, 184, 166, 0.12), rgba(13, 148, 136, 0.08));
+        backdrop-filter: blur(12px);
+        border: 1px solid rgba(20, 184, 166, 0.3);
+        border-radius: 8px;
+        padding: 6px 12px;
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        margin-left: 12px;
+        vertical-align: middle;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+        font-size: 12px;
+        font-weight: 500;
+        `;
+        
+        chip.innerHTML = `
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style="flex-shrink:0;">
+            <circle cx="12" cy="12" r="10" stroke="#14b8a6" stroke-width="2" fill="rgba(20,184,166,0.15)"/>
+            <circle cx="12" cy="12" r="3" fill="#5eead4"/>
+        </svg>
+        <span class="stat-num" data-label="Total Players" style="color:#5eead4; font-weight:600; position:relative; cursor:help;">${total}</span>
+        <span style="color:#99f6e4; opacity:0.8;">|</span>
+        <span class="stat-num" data-label="Members" style="color:#99f6e4; position:relative; cursor:help;">${counts.members}</span>
+        <span style="color:#5eead4; opacity:0.6;">+</span>
+        <span class="stat-num" data-label="Tourists" style="color:#5eead4; opacity:0.6; position:relative; cursor:help;">${counts.tourists}</span>
+        `;
+        
+        const style = document.createElement('style');
+        style.textContent = `
+        .stat-num::before {
+            content: attr(data-label);
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%) translateY(-4px);
+            background: rgba(13, 148, 136, 0.95);
+            color: #f0fdfa;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 600;
+            white-space: nowrap;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s, transform 0.2s;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(20, 184, 166, 0.4);
         }
-        this.playerType.attached = false;
-      },
+        .stat-num::after {
+            content: '';
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 4px solid transparent;
+            border-top-color: rgba(13, 148, 136, 0.95);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s;
+        }
+        .stat-num:hover::before {
+            opacity: 1;
+            transform: translateX(-50%) translateY(-8px);
+        }
+        .stat-num:hover::after {
+            opacity: 1;
+        }
+        `;
+        if (!document.querySelector('[data-player-stats-style]')) {
+        style.setAttribute('data-player-stats-style', 'true');
+        document.head.appendChild(style);
+        }
+        
+        el.parentElement.style.position = 'relative';
+        el.style.display = 'inline-block';
+        el.after(chip);
+    } catch {}
+    },
+
+    enablePlayerTypeDisplay() {
+    if (!location.pathname.includes('/games/play/')) return;
+    if (this.playerType.attached) return;
+
+    const findAndRender = () => {
+        const gameTitle = document.querySelector('h1.game-title');
+        if (gameTitle) {
+        this.renderPlayerChip(gameTitle);
+        this.playerType.attached = true;
+        return true;
+        }
+        return false;
+    };
+
+    if (findAndRender()) return;
+
+    const mo = new MutationObserver(() => {
+        if (findAndRender()) mo.disconnect();
+    });
+    mo.observe(document.body, { childList: true, subtree: true });
+    this.playerType.observer = mo;
+    },
+
+    disablePlayerTypeDisplay() {
+    if (this.playerType.observer) {
+        this.playerType.observer.disconnect();
+        this.playerType.observer = null;
+    }
+    const chip = document.querySelector('[data-player-stats-chip]');
+    if (chip) chip.remove();
+    const style = document.querySelector('[data-player-stats-style]');
+    if (style) style.remove();
+    this.playerType.attached = false;
+    },
 
       enableStreakKeeper() {
         if (this.streakKeeper.timer) return;
@@ -4832,3 +4898,1470 @@
   }
 })();
 
+
+// Faster Friends 
+
+(function () {
+    "use strict";
+
+    const URL_PATTERN = /^https:\/\/www\.kogama\.com\/profile\/(\d+)\/friends\/$/i;
+
+    function getViewedProfileID() {
+        const m = window.location.href.match(URL_PATTERN);
+        return m ? m[1] : null;
+    }
+
+    function getBootstrap() {
+        if (window.App?.options?.bootstrap) return window.App.options.bootstrap;
+        const scripts = document.scripts;
+        for (let i = 0; i < scripts.length; i++) {
+            const t = scripts[i].textContent;
+            if (!t || !t.includes("options.bootstrap")) continue;
+            const m = t.match(/options\.bootstrap\s*=\s*({[\s\S]*?})\s*;/);
+            if (!m) continue;
+            try { return JSON.parse(m[1]); } catch { return null; }
+        }
+        return null;
+    }
+
+    function getCurrentUser() {
+        const b = getBootstrap();
+        return b?.current_user || null;
+    }
+
+    function isOwnProfile(viewedID, currentUser) {
+        if (!currentUser || !viewedID) return false;
+        return String(currentUser.id) === String(viewedID);
+    }
+
+    function waitBootstrapStart(fn) {
+        const i = setInterval(() => {
+            if (getBootstrap()) {
+                clearInterval(i);
+                fn();
+            }
+        }, 50);
+    }
+
+    function run() {
+        if (!URL_PATTERN.test(window.location.href)) return;
+        const viewedProfileID = getViewedProfileID();
+        const currentUser = getCurrentUser();
+
+        if (!viewedProfileID || !currentUser?.id) {
+            console.error("Faster Friends: bootstrap not ready");
+            return;
+        }
+
+        const isOwn = isOwnProfile(viewedProfileID, currentUser);
+
+        function alphaFirstComparator(a, b) {
+            const sa = String(a || "").toLowerCase();
+            const sb = String(b || "").toLowerCase();
+            const isLetter = s => /^[a-z]/.test(s);
+            const aLetter = isLetter(sa);
+            const bLetter = isLetter(sb);
+            if (aLetter && !bLetter) return -1;
+            if (!aLetter && bLetter) return 1;
+            return sa.localeCompare(sb, undefined, { sensitivity: "base", numeric: false });
+        }
+
+        function ensureRootUIRemoved() {
+            document.getElementById("frlscrape-panel")?.remove();
+            document.getElementById("frlscrape-style")?.remove();
+            document.getElementById("frlscrape-reopen")?.remove();
+        }
+
+
+        function createStyle() {
+            const css = `
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes shimmer-glow {
+  0%, 100% { 
+    box-shadow: 
+      0 8px 32px rgba(74, 222, 183, 0.25),
+      0 0 60px rgba(74, 222, 183, 0.12),
+      inset 0 1px 0 rgba(74, 222, 183, 0.2);
+  }
+  50% { 
+    box-shadow: 
+      0 8px 32px rgba(74, 222, 183, 0.35),
+      0 0 80px rgba(74, 222, 183, 0.18),
+      inset 0 1px 0 rgba(74, 222, 183, 0.3);
+  }
+}
+
+#frlscrape-panel {
+  position: fixed;
+  z-index: 100000;
+  width: min(920px, 92vw);
+  max-height: 86vh;
+  background: linear-gradient(135deg, #0d1f1d 0%, #1a2f2d 50%, #0d1f1d 100%);
+  color: #e0f0ee;
+  border-radius: 12px;
+  box-shadow: 
+    0 0 40px rgba(74, 222, 183, 0.2),
+    0 20px 80px rgba(0, 0, 0, 0.7),
+    inset 0 1px 0 rgba(74, 222, 183, 0.15);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  border: 1px solid rgba(74, 222, 183, 0.25);
+  backdrop-filter: blur(20px);
+  animation: fadeIn 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+#frlscrape-panel::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 180px;
+  height: 180px;
+  background: radial-gradient(circle at top right, rgba(74, 222, 183, 0.15) 0%, transparent 60%);
+  border-radius: 0 12px 0 0;
+  pointer-events: none;
+}
+
+#frlscrape-panel::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 180px;
+  height: 180px;
+  background: radial-gradient(circle at bottom left, rgba(42, 157, 143, 0.1) 0%, transparent 60%);
+  pointer-events: none;
+}
+
+#frlscrape-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 24px;
+  gap: 16px;
+  border-bottom: 1px solid rgba(74, 222, 183, 0.12);
+  cursor: grab;
+  user-select: none;
+  background: linear-gradient(135deg, rgba(20, 35, 33, 0.85) 0%, rgba(15, 28, 26, 0.95) 100%);
+  position: relative;
+  z-index: 1;
+}
+
+#frlscrape-header::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 5%;
+  right: 5%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent 0%, rgba(74, 222, 183, 0.4) 50%, transparent 100%);
+}
+
+#frlscrape-header.dragging {
+  cursor: grabbing;
+}
+
+#frlscrape-title {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 3px;
+  color: rgba(74, 222, 183, 0.7);
+  text-transform: uppercase;
+  position: relative;
+  white-space: nowrap;
+}
+
+#frlscrape-title::before,
+#frlscrape-title::after {
+  content: '◆';
+  position: absolute;
+  color: rgba(74, 222, 183, 0.5);
+  font-size: 8px;
+}
+
+#frlscrape-title::before { left: -20px; }
+#frlscrape-title::after { right: -20px; }
+
+#frlscrape-controls {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+#frlscrape-close {
+  background: rgba(74, 222, 183, 0.08);
+  border: 1px solid rgba(74, 222, 183, 0.2);
+  color: #4adeb7;
+  font-size: 18px;
+  cursor: pointer;
+  padding: 8px 14px;
+  border-radius: 8px;
+  line-height: 1;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+#frlscrape-close:hover {
+  background: rgba(74, 222, 183, 0.15);
+  border-color: rgba(74, 222, 183, 0.4);
+  color: #6ef0cb;
+  transform: scale(1.05);
+}
+
+#frlscrape-search {
+  flex: 1;
+  max-width: 480px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+#frlscrape-search input {
+  width: 100%;
+  padding: 10px 15px;
+  border-radius: 8px;
+  border: 1px solid rgba(74, 222, 183, 0.18);
+  background: rgba(0, 0, 0, 0.5);
+  color: #e0f0ee;
+  outline: none;
+  font-size: 14px;
+  transition: all 0.2s ease;
+}
+
+#frlscrape-search input::placeholder {
+  color: rgba(74, 222, 183, 0.4);
+}
+
+#frlscrape-search input:focus {
+  border-color: rgba(74, 222, 183, 0.4);
+  box-shadow: 0 0 0 3px rgba(74, 222, 183, 0.1);
+  background: rgba(0, 0, 0, 0.6);
+}
+
+#frlscrape-body {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 18px;
+  padding: 24px;
+  overflow: auto;
+  background: linear-gradient(180deg, rgba(13, 23, 21, 0.95) 0%, rgba(10, 18, 16, 0.98) 100%);
+  position: relative;
+  z-index: 1;
+}
+
+#frlscrape-body.two-columns {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+
+#frlscrape-body::after {
+  content: 'Made by Simon';
+  position: absolute;
+  right: 12px;
+  bottom: 20px;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  font-size: 10px;
+  letter-spacing: 2.5px;
+  color: rgba(74, 222, 183, 0.35);
+  font-weight: 500;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+
+.frsection {
+  background: linear-gradient(135deg, rgba(74, 222, 183, 0.04) 0%, rgba(42, 157, 143, 0.02) 100%);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(74, 222, 183, 0.08);
+  padding: 18px;
+  border-radius: 10px;
+  min-height: 150px;
+  max-height: 60vh;
+  overflow: auto;
+  transition: all 0.25s ease;
+}
+
+.frsection:hover {
+  background: linear-gradient(135deg, rgba(74, 222, 183, 0.08) 0%, rgba(42, 157, 143, 0.04) 100%);
+  border-color: rgba(74, 222, 183, 0.2);
+}
+
+.frsection h3 {
+  margin: 0 0 14px 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: #4adeb7;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  position: relative;
+}
+
+.frsection h3::before {
+  content: '◆';
+  position: absolute;
+  left: -18px;
+  color: rgba(74, 222, 183, 0.5);
+  font-size: 9px;
+}
+
+.entry {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  margin-right: 2px;
+  margin-bottom: 7px;
+}
+
+.entry a {
+  color: #b8d8d0;
+  text-decoration: none;
+  font-size: 14px;
+  padding: 5px 10px;
+  border-radius: 8px;
+  display: inline-block;
+  transition: all 0.2s ease;
+}
+
+.entry a:hover {
+  background: rgba(74, 222, 183, 0.15);
+  color: #4adeb7;
+  transform: translateY(-1px);
+  box-shadow: 0 3px 10px rgba(74, 222, 183, 0.2);
+}
+
+.separator {
+  display: inline;
+  margin-right: 4px;
+  color: rgba(74, 222, 183, 0.3);
+}
+
+.empty-note {
+  color: rgba(74, 222, 183, 0.4);
+  font-size: 13px;
+  padding: 10px 5px;
+  font-style: italic;
+}
+
+#frlscrape-reopen {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 28px;
+  z-index: 100000;
+  padding: 12px 26px;
+  border-radius: 10px;
+  border: 1px solid rgba(74, 222, 183, 0.35);
+  background: linear-gradient(135deg, rgba(74, 222, 183, 0.18) 0%, rgba(42, 157, 143, 0.12) 100%);
+  backdrop-filter: blur(12px);
+  color: #4adeb7;
+  cursor: pointer;
+  box-shadow: 0 6px 24px rgba(74, 222, 183, 0.25);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  display: none;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  animation: shimmer-glow 3s ease-in-out infinite;
+}
+
+#frlscrape-reopen:hover {
+  transform: translateX(-50%) translateY(-2px);
+  box-shadow: 0 8px 32px rgba(74, 222, 183, 0.35);
+  border-color: rgba(74, 222, 183, 0.5);
+}
+
+/* Scrollbars */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(74, 222, 183, 0.35) 0%, rgba(42, 157, 143, 0.35) 100%);
+  border-radius: 5px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, rgba(74, 222, 183, 0.55) 0%, rgba(42, 157, 143, 0.55) 100%);
+  background-clip: padding-box;
+}
+
+@media (max-width: 880px) {
+  #frlscrape-body {
+    grid-template-columns: 1fr !important;
+  }
+  
+  #frlscrape-body::after {
+    display: none;
+  }
+}
+`;
+            const style = document.createElement("style");
+            style.id = "frlscrape-style";
+            style.textContent = css;
+            document.head.appendChild(style);
+        }
+
+        function buildUI(isOwn) {
+            ensureRootUIRemoved();
+            createStyle();
+
+            const panel = document.createElement("div");
+            panel.id = "frlscrape-panel";
+            panel.setAttribute("role", "dialog");
+            panel.setAttribute("aria-modal", "false");
+
+            const header = document.createElement("div");
+            header.id = "frlscrape-header";
+
+            const leftWrap = document.createElement("div");
+            leftWrap.style.display = "flex";
+            leftWrap.style.alignItems = "center";
+            leftWrap.style.gap = "16px";
+
+            const title = document.createElement("div");
+            title.id = "frlscrape-title";
+            title.textContent = isOwn ? "◆ Friends & Requests ◆" : "◆ Friends Overview ◆";
+
+            const searchWrap = document.createElement("div");
+            searchWrap.id = "frlscrape-search";
+
+            const input = document.createElement("input");
+            input.id = "frlscrape-search-input";
+            input.type = "search";
+            input.placeholder = "Search by username...";
+            input.autocomplete = "off";
+            input.addEventListener("input", () => filterAllLists(input.value.trim().toLowerCase()));
+
+            searchWrap.appendChild(input);
+            leftWrap.appendChild(title);
+            leftWrap.appendChild(searchWrap);
+
+            const controls = document.createElement("div");
+            controls.id = "frlscrape-controls";
+
+            const closeBtn = document.createElement("button");
+            closeBtn.id = "frlscrape-close";
+            closeBtn.setAttribute("aria-label", "Close");
+            closeBtn.innerHTML = "×";
+
+            controls.appendChild(closeBtn);
+            header.appendChild(leftWrap);
+            header.appendChild(controls);
+
+            const body = document.createElement("div");
+            body.id = "frlscrape-body";
+            
+            if (!isOwn) {
+                body.classList.add("two-columns");
+            }
+
+            const friendsSection = document.createElement("div");
+            friendsSection.className = "frsection";
+            friendsSection.id = "friendsList";
+            const fh = document.createElement("h3");
+            fh.textContent = "Friends";
+            friendsSection.appendChild(fh);
+            body.appendChild(friendsSection);
+
+            let invitingSection, sentSection, commonSection;
+
+            if (isOwn) {
+                invitingSection = document.createElement("div");
+                invitingSection.className = "frsection";
+                invitingSection.id = "invitingList";
+                const ih = document.createElement("h3");
+                ih.textContent = "Incoming Requests";
+                invitingSection.appendChild(ih);
+
+                sentSection = document.createElement("div");
+                sentSection.className = "frsection";
+                sentSection.id = "sentList";
+                const sh = document.createElement("h3");
+                sh.textContent = "Sent Requests";
+                sentSection.appendChild(sh);
+
+                body.appendChild(invitingSection);
+                body.appendChild(sentSection);
+            } else {
+                commonSection = document.createElement("div");
+                commonSection.className = "frsection";
+                commonSection.id = "commonList";
+                const ch = document.createElement("h3");
+                ch.textContent = "Mutual Friends";
+                commonSection.appendChild(ch);
+
+                body.appendChild(commonSection);
+            }
+
+            panel.appendChild(header);
+            panel.appendChild(body);
+            document.body.appendChild(panel);
+
+            panel.style.left = "50%";
+            panel.style.top = "50%";
+            panel.style.transform = "translate(-50%,-50%)";
+            delete panel.dataset.dragged;
+
+            const reopen = document.createElement("button");
+            reopen.id = "frlscrape-reopen";
+            reopen.type = "button";
+            reopen.textContent = "◆ Open Friends Panel ◆";
+            document.body.appendChild(reopen);
+
+            const ui = { 
+                panel, 
+                header, 
+                input, 
+                friendsSection, 
+                invitingSection, 
+                sentSection, 
+                commonSection,
+                reopen 
+            };
+
+            setupDragging(ui);
+            setupEvents(ui);
+
+            return ui;
+        }
+
+        function setupDragging(ui) {
+            const { panel, header } = ui;
+
+            const centerPanel = () => {
+                const vw = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
+                const vh = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0);
+                const w = panel.offsetWidth;
+                const h = panel.offsetHeight;
+                panel.style.left = `${Math.max(12, (vw - w) / 2)}px`;
+                panel.style.top = `${Math.max(12, (vh - h) / 2)}px`;
+            };
+
+            centerPanel();
+
+            window.addEventListener("resize", () => {
+                if (!panel.dataset.dragged) centerPanel();
+            });
+
+            let dragState = null;
+
+            function startDrag(clientX, clientY) {
+                const rect = panel.getBoundingClientRect();
+                panel.style.left = `${rect.left}px`;
+                panel.style.top = `${rect.top}px`;
+                panel.style.transform = "";
+                panel.classList.add("dragging");
+                header.classList.add("dragging");
+                dragState = {
+                    startX: clientX,
+                    startY: clientY,
+                    panelLeft: rect.left,
+                    panelTop: rect.top,
+                    panelW: rect.width,
+                    panelH: rect.height
+                };
+                panel.style.transition = "none";
+            }
+
+            function moveDrag(clientX, clientY) {
+                if (!dragState) return;
+                const dx = clientX - dragState.startX;
+                const dy = clientY - dragState.startY;
+                const left = dragState.panelLeft + dx;
+                const top = dragState.panelTop + dy;
+                const maxLeft = Math.max(8, window.innerWidth - dragState.panelW - 8);
+                const maxTop = Math.max(8, window.innerHeight - dragState.panelH - 8);
+                panel.style.left = `${Math.min(Math.max(8, left), maxLeft)}px`;
+                panel.style.top = `${Math.min(Math.max(8, top), maxTop)}px`;
+                panel.dataset.dragged = "1";
+            }
+
+            function endDrag() {
+                if (!dragState) return;
+                dragState = null;
+                panel.classList.remove("dragging");
+                header.classList.remove("dragging");
+                panel.style.transition = "";
+            }
+
+            header.addEventListener("mousedown", (ev) => {
+                if (ev.target.closest("#frlscrape-close")) return;
+                startDrag(ev.clientX, ev.clientY);
+                const onMove = (e) => moveDrag(e.clientX, e.clientY);
+                const onUp = () => {
+                    endDrag();
+                    document.removeEventListener("mousemove", onMove);
+                    document.removeEventListener("mouseup", onUp);
+                };
+                document.addEventListener("mousemove", onMove);
+                document.addEventListener("mouseup", onUp);
+            });
+
+            header.addEventListener("touchstart", (ev) => {
+                if (ev.target.closest("#frlscrape-close")) return;
+                const t = ev.touches[0];
+                startDrag(t.clientX, t.clientY);
+                const onMove = (e) => {
+                    const t2 = e.touches[0];
+                    moveDrag(t2.clientX, t2.clientY);
+                };
+                const onEnd = () => {
+                    endDrag();
+                    document.removeEventListener("touchmove", onMove);
+                    document.removeEventListener("touchend", onEnd);
+                    document.removeEventListener("touchcancel", onEnd);
+                };
+                document.addEventListener("touchmove", onMove, { passive: false });
+                document.addEventListener("touchend", onEnd);
+                document.addEventListener("touchcancel", onEnd);
+            });
+        }
+
+        function setupEvents(ui) {
+            const { panel, reopen } = ui;
+
+            document.getElementById("frlscrape-close").addEventListener("click", () => {
+                panel.style.display = "none";
+                reopen.style.display = "block";
+            });
+
+            reopen.addEventListener("click", () => {
+                panel.style.display = "";
+                reopen.style.display = "none";
+            });
+
+            document.addEventListener("keydown", (e) => {
+                if (e.key === "Escape") {
+                    if (panel.style.display !== "none") {
+                        panel.style.display = "none";
+                        reopen.style.display = "block";
+                    } else {
+                        panel.style.display = "";
+                        reopen.style.display = "none";
+                    }
+                }
+            });
+
+            requestAnimationFrame(() => {
+                document.addEventListener("click", (e) => {
+                    if (panel.style.display === "none") return;
+                    if (!panel.contains(e.target) && e.target !== reopen) {
+                        panel.style.display = "none";
+                        reopen.style.display = "block";
+                    }
+                });
+            });
+        }
+
+        function createEntryLink(text, href, id) {
+            const wrapper = document.createElement("span");
+            wrapper.className = "entry";
+            if (id) wrapper.dataset.entryId = id;
+            const a = document.createElement("a");
+            a.href = href;
+            a.target = "_blank";
+            a.rel = "noopener noreferrer";
+            a.textContent = text;
+            const sep = document.createElement("span");
+            sep.className = "separator";
+            sep.textContent = ",";
+            wrapper.appendChild(a);
+            wrapper.appendChild(sep);
+            return wrapper;
+        }
+
+        function updateSeparators(sectionEl) {
+            if (!sectionEl) return;
+            const entries = Array.from(sectionEl.querySelectorAll(".entry"));
+            entries.forEach(e => (e.style.display = e.style.display || ""));
+            const visible = entries.filter(e => e.style.display !== "none");
+            sectionEl.querySelectorAll(".empty-note").forEach(n => n.remove());
+            
+            if (visible.length === 0) {
+                entries.forEach(e => (e.style.display = "none"));
+                const note = document.createElement("div");
+                note.className = "empty-note";
+                note.textContent = "No matches.";
+                sectionEl.appendChild(note);
+                return;
+            }
+            
+            for (let i = 0; i < entries.length; i++) {
+                const el = entries[i];
+                const sep = el.querySelector(".separator");
+                const isVisible = el.style.display !== "none";
+                const hasVisibleAfter = entries.slice(i + 1).some(e => e.style.display !== "none");
+                if (sep) sep.style.display = isVisible && hasVisibleAfter ? "inline" : "none";
+            }
+        }
+
+        async function fetchJSON(url, opts = {}) {
+            const controller = new AbortController();
+            const id = setTimeout(() => controller.abort(), 12000);
+            try {
+                const res = await fetch(url, { ...opts, signal: controller.signal });
+                clearTimeout(id);
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                return await res.json();
+            } finally {
+                clearTimeout(id);
+            }
+        }
+
+        function appendSortedEntries(container, items) {
+            if (!container) return;
+            container.querySelectorAll(".entry, .empty-note").forEach(n => n.remove());
+            const mapped = items.slice();
+            mapped.sort((a, b) => alphaFirstComparator(a.name, b.name));
+            
+            if (mapped.length === 0) {
+                const n = document.createElement("div");
+                n.className = "empty-note";
+                n.textContent = "No entries.";
+                container.appendChild(n);
+                return;
+            }
+            
+            mapped.forEach((it) => {
+                const el = createEntryLink(it.name, it.href, it.id);
+                container.appendChild(el);
+            });
+            updateSeparators(container);
+        }
+
+        async function fetchAndRenderFriends(ui, profileID) {
+            const url = `https://www.kogama.com/user/${profileID}/friend/?count=555`;
+            try {
+                const data = await fetchJSON(url);
+                const friends = Array.isArray(data.data) ? data.data.filter(f => f.friend_status === "accepted") : [];
+                const items = friends.map(f => ({ 
+                    name: f.friend_username || f.friend_profile_id, 
+                    href: `https://www.kogama.com/profile/${f.friend_profile_id}/`, 
+                    id: f.friend_profile_id 
+                }));
+                appendSortedEntries(ui.friendsSection, items);
+                return items;
+            } catch (err) {
+                const note = document.createElement("div");
+                note.className = "empty-note";
+                note.textContent = "Failed to load friends.";
+                ui.friendsSection.appendChild(note);
+                console.error("Faster Friends: Friends fetch error", err);
+                return [];
+            }
+        }
+
+        async function fetchAndRenderRequests(ui, profileID) {
+            const url = `https://www.kogama.com/user/${profileID}/friend/requests/?page=1&count=1000`;
+            try {
+                const data = await fetchJSON(url, { method: "GET", headers: { "Content-Type": "application/json" } });
+                const arr = Array.isArray(data.data) ? data.data : [];
+                
+                const sent = arr
+                    .filter(r => String(r.profile_id) === String(profileID))
+                    .map(r => ({ 
+                        name: r.friend_username || `id:${r.friend_profile_id}`, 
+                        href: `https://www.kogama.com/profile/${r.friend_profile_id}/`, 
+                        id: r.id 
+                    }));
+                
+                const inviting = arr
+                    .filter(r => String(r.profile_id) !== String(profileID))
+                    .map(r => ({ 
+                        name: r.profile_username || `id:${r.profile_id}`, 
+                        href: `https://www.kogama.com/profile/${r.profile_id}/`, 
+                        id: r.id 
+                    }));
+                
+                appendSortedEntries(ui.sentSection, sent);
+                appendSortedEntries(ui.invitingSection, inviting);
+            } catch (err) {
+                const note = document.createElement("div");
+                note.className = "empty-note";
+                note.textContent = "Failed to load requests.";
+                if (ui.invitingSection) ui.invitingSection.appendChild(note);
+                if (ui.sentSection) ui.sentSection.appendChild(note.cloneNode(true));
+                console.error("Faster Friends: Requests fetch error", err);
+            }
+        }
+
+        async function fetchAndRenderCommonFriends(ui, viewedProfileID, currentUserID) {
+            try {
+                const [viewedData, currentData] = await Promise.all([
+                    fetchJSON(`https://www.kogama.com/user/${viewedProfileID}/friend/?count=555`),
+                    fetchJSON(`https://www.kogama.com/user/${currentUserID}/friend/?count=555`)
+                ]);
+
+                const viewedFriends = Array.isArray(viewedData.data) 
+                    ? viewedData.data.filter(f => f.friend_status === "accepted") 
+                    : [];
+                const currentFriends = Array.isArray(currentData.data) 
+                    ? currentData.data.filter(f => f.friend_status === "accepted") 
+                    : [];
+
+                const currentFriendIds = new Set(currentFriends.map(f => String(f.friend_profile_id)));
+
+                const commonFriends = viewedFriends
+                    .filter(f => currentFriendIds.has(String(f.friend_profile_id)))
+                    .map(f => ({
+                        name: f.friend_username || f.friend_profile_id,
+                        href: `https://www.kogama.com/profile/${f.friend_profile_id}/`,
+                        id: f.friend_profile_id
+                    }));
+
+                appendSortedEntries(ui.commonSection, commonFriends);
+            } catch (err) {
+                const note = document.createElement("div");
+                note.className = "empty-note";
+                note.textContent = "Failed to load mutual friends.";
+                if (ui.commonSection) ui.commonSection.appendChild(note);
+                console.error("Faster Friends: Mutual friends fetch error", err);
+            }
+        }
+
+        function filterAllLists(query) {
+            const lists = ["friendsList", "invitingList", "sentList", "commonList"];
+            lists.forEach(id => {
+                const root = document.getElementById(id);
+                if (!root) return;
+                const entries = Array.from(root.querySelectorAll(".entry"));
+                entries.forEach(el => {
+                    const link = el.querySelector("a");
+                    const matches = !query || (link && link.textContent.toLowerCase().includes(query));
+                    el.style.display = matches ? "" : "none";
+                });
+                updateSeparators(root);
+            });
+        }
+
+        const ui = buildUI(isOwn);
+
+         console.log('Faster Friends: Initialized', {
+            viewedProfile: viewedProfileID,
+            currentUser: currentUser.id,
+            isOwnProfile: isOwn
+        });
+
+        if (isOwn) {
+            fetchAndRenderFriends(ui, viewedProfileID);
+            fetchAndRenderRequests(ui, viewedProfileID);
+        } else {
+            fetchAndRenderFriends(ui, viewedProfileID);
+            fetchAndRenderCommonFriends(ui, viewedProfileID, currentUser.id);
+        }
+    }
+
+    waitBootstrapStart(run);
+
+})();
+
+// Avatar Marketplace Finder
+(function () {
+	"use strict"
+
+	if (!/^https:\/\/www\.kogama\.com\/profile\/\d+\/avatars\/?$/.test(location.href)) return
+
+	const PAGE_COUNT = 500
+	const MAX_PAGES = 40
+	const CONCURRENCY = 4
+	const BATCH_DELAY = 150
+
+	let modal = null
+	let overlay = null
+	let closeBtn = null
+	let searchInput = null
+	let resultsContainer = null
+	let statusBar = null
+	let fetching = false
+	let controller = null
+	let allResults = []
+
+	function base(u) {
+		return u ? u.split("?")[0] : ""
+	}
+
+	function openMarketplace(o) {
+		window.open(`https://www.kogama.com/marketplace/avatar/${o.product_id}/`, "_blank")
+	}
+
+	function abortFetch() {
+		if (controller) {
+			controller.abort()
+			controller = null
+		}
+		fetching = false
+	}
+
+	function ensurePanel() {
+		if (modal) {
+			modal.style.display = "flex"
+			overlay.style.display = "block"
+			closeBtn.style.display = "flex"
+			return
+		}
+
+		overlay = document.createElement("div")
+		overlay.className = "amf-overlay"
+		overlay.onclick = closePanel
+
+		modal = document.createElement("div")
+		modal.className = "amf-panel"
+
+		const header = document.createElement("div")
+		header.className = "amf-header"
+
+		const title = document.createElement("div")
+		title.className = "amf-title"
+		title.textContent = "◆ Marketplace Search ◆"
+
+		searchInput = document.createElement("input")
+		searchInput.className = "amf-search"
+		searchInput.type = "search"
+		searchInput.placeholder = "Filter results..."
+		searchInput.addEventListener("input", filterResults)
+
+		statusBar = document.createElement("div")
+		statusBar.className = "amf-status"
+		statusBar.textContent = "Ready"
+
+		header.appendChild(title)
+		header.appendChild(searchInput)
+		header.appendChild(statusBar)
+
+		resultsContainer = document.createElement("div")
+		resultsContainer.className = "amf-results"
+
+		closeBtn = document.createElement("button")
+		closeBtn.className = "amf-close"
+		closeBtn.innerHTML = "×"
+		closeBtn.onclick = closePanel
+
+		modal.appendChild(header)
+		modal.appendChild(resultsContainer)
+		modal.appendChild(closeBtn)
+
+		document.body.append(overlay, modal)
+	}
+
+	function closePanel() {
+		if (!modal) return
+		abortFetch()
+		modal.style.display = "none"
+		overlay.style.display = "none"
+		allResults = []
+		if (searchInput) searchInput.value = ""
+	}
+
+	function createLoading() {
+		const loading = document.createElement("div")
+		loading.className = "amf-loading"
+		loading.innerHTML = `
+			<div class="amf-spinner"></div>
+			<div class="amf-loading-text">Searching marketplace...</div>
+		`
+		return loading
+	}
+
+	function updateStatus(text, isLoading = false) {
+		if (!statusBar) return
+		statusBar.textContent = text
+		statusBar.className = `amf-status ${isLoading ? 'amf-status-loading' : ''}`
+	}
+
+	function createCard(item) {
+		const card = document.createElement("div")
+		card.className = "amf-card"
+		card.dataset.name = (item.name || "").toLowerCase()
+
+		const imgWrap = document.createElement("div")
+		imgWrap.className = "amf-card-img-wrap"
+
+		const img = document.createElement("img")
+		img.src = item.image_large || item.images?.large || item.image || ""
+		img.alt = item.name || "Avatar"
+		img.loading = "lazy"
+		img.onerror = function() {
+			this.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect fill='%231a2f2d' width='100' height='100'/%3E%3Ctext x='50' y='50' font-family='sans-serif' font-size='14' fill='%234adeb7' text-anchor='middle' dominant-baseline='middle'%3ENo Image%3C/text%3E%3C/svg%3E"
+		}
+
+		const label = document.createElement("div")
+		label.className = "amf-card-label"
+		label.textContent = item.name || "Unknown Avatar"
+
+
+
+		card.onclick = () => openMarketplace(item)
+		imgWrap.appendChild(img)
+		card.appendChild(imgWrap)
+		card.appendChild(label)
+
+		return card
+	}
+
+	function filterResults() {
+		const query = searchInput.value.toLowerCase().trim()
+		const cards = resultsContainer.querySelectorAll(".amf-card")
+		
+		let visibleCount = 0
+		cards.forEach(card => {
+			const name = card.dataset.name || ""
+			const matches = !query || name.includes(query)
+			card.style.display = matches ? "" : "none"
+			if (matches) visibleCount++
+		})
+
+		updateStatus(`${visibleCount} of ${cards.length} results`)
+	}
+
+	async function searchMarketplace(name, imageUrl) {
+		if (fetching) abortFetch()
+		fetching = true
+
+		controller = new AbortController()
+		ensurePanel()
+		resultsContainer.innerHTML = ""
+		allResults = []
+		searchInput.value = ""
+
+		const loading = createLoading()
+		resultsContainer.appendChild(loading)
+		updateStatus("Searching...", true)
+
+		let page = 1
+		let active = 0
+		let found = false
+		let totalFetched = 0
+
+		const run = async () => {
+			if (found || page > MAX_PAGES || controller.signal.aborted) return
+			active++
+
+			const url = `https://www.kogama.com/model/market/?page=${page}&count=${PAGE_COUNT}&category=avatar&q=${encodeURIComponent(name)}`
+			const currentPage = page
+			page++
+
+			try {
+				const res = await fetch(url, { signal: controller.signal })
+				const json = await res.json()
+				
+
+				if (json?.data?.length && currentPage === 1) {
+					// console.log('Avatar Marketplace Finder: First item structure:', json.data[0])
+				}
+				
+				if (!json?.data?.length) {
+					found = true
+					return
+				}
+
+				totalFetched += json.data.length
+
+				if (resultsContainer.contains(loading)) {
+					resultsContainer.removeChild(loading)
+				}
+
+				allResults.push(...json.data)
+				for (const item of json.data) {
+					if (controller.signal.aborted) break
+
+					const card = createCard(item)
+					resultsContainer.appendChild(card)
+
+					if (!found && base(item.image_large) === base(imageUrl)) {
+						found = true
+						card.classList.add("amf-card-matched")
+						setTimeout(() => {
+							openMarketplace(item)
+							closePanel()
+						}, 500)
+						break
+					}
+				}
+
+				updateStatus(`Found ${totalFetched} results (Page ${currentPage}/${MAX_PAGES})`, true)
+
+			} catch (e) {
+				if (e.name !== "AbortError") {
+					console.error("Marketplace search error:", e)
+				}
+			} finally {
+				active--
+				if (!found && !controller.signal.aborted) {
+					await new Promise(r => setTimeout(r, BATCH_DELAY))
+					if (active < CONCURRENCY) run()
+				}
+			}
+		}
+
+		for (let i = 0; i < CONCURRENCY; i++) run()
+		while (active > 0 && !controller.signal.aborted) {
+			await new Promise(r => setTimeout(r, 50))
+		}
+
+		fetching = false
+		
+		if (!found && resultsContainer.contains(loading)) {
+			resultsContainer.removeChild(loading)
+		}
+
+		if (!controller.signal.aborted) {
+			updateStatus(`${totalFetched} results found`)
+		}
+	}
+
+	function enhanceAvatars() {
+		document.querySelectorAll(".MuiGrid-root.MuiGrid-container.MuiGrid-spacing-xs-2 .MuiGrid-item").forEach(avatar => {
+			if (avatar.querySelector("av")) return
+
+			const wrap = avatar.querySelector("._2uIZL")
+			const span = wrap?.querySelector("span")
+			if (!span) return
+
+			const name = span.textContent.trim()
+			const style = avatar.querySelector("._3Up3H")?.getAttribute("style") || ""
+			const match = style.match(/url\("([^"]+)"\)/)
+			const imgUrl = match ? match[1] : ""
+
+			const av = document.createElement("av")
+			av.textContent = name
+			av.onclick = () => searchMarketplace(name, imgUrl)
+
+			wrap.innerHTML = ""
+			wrap.appendChild(av)
+		})
+	}
+
+	const style = document.createElement("style")
+	style.textContent = `
+@keyframes avflow {
+	0% { background-position: 0% 50% }
+	50% { background-position: 100% 50% }
+	100% { background-position: 0% 50% }
+}
+
+@keyframes fadeIn {
+	from { opacity: 0; transform: translateY(10px); }
+	to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes spin {
+	0% { transform: rotate(0deg); }
+	100% { transform: rotate(360deg); }
+}
+
+@keyframes pulse {
+	0%, 100% { opacity: 0.6; }
+	50% { opacity: 1; }
+}
+
+av {
+	background: linear-gradient(90deg, #0a2e2a, #1a4d47, #2a9d8f, #4adeb7, #6ef0cb, #4adeb7, #2a9d8f, #1a4d47, #0a2e2a);
+	background-size: 400% 100%;
+	-webkit-background-clip: text;
+	background-clip: text;
+	color: transparent;
+	animation: avflow 8s ease-in-out infinite;
+	font-weight: 700;
+	cursor: pointer;
+	transition: transform 0.2s ease;
+	display: inline-block;
+}
+
+av:hover {
+	transform: scale(1.05);
+}
+
+.amf-overlay {
+	position: fixed;
+	inset: 0;
+	background: rgba(0, 0, 0, 0.75);
+	backdrop-filter: blur(6px);
+	z-index: 99998;
+	animation: fadeIn 0.2s ease;
+}
+
+.amf-panel {
+	position: fixed;
+	top: 50%;
+	left: 50%;
+	transform: translate(-50%, -50%);
+	width: min(1600px, 96vw);
+	max-height: 92vh;
+	display: flex;
+	flex-direction: column;
+	background: linear-gradient(135deg, #0d1f1d 0%, #1a2f2d 50%, #0d1f1d 100%);
+	border-radius: 12px;
+	box-shadow: 0 0 40px rgba(74, 222, 183, 0.2), 0 20px 80px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(74, 222, 183, 0.15);
+	border: 1px solid rgba(74, 222, 183, 0.25);
+	z-index: 99999;
+	animation: fadeIn 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+	overflow: hidden;
+}
+
+
+.amf-panel::before {
+	content: '';
+	position: absolute;
+	top: 0;
+	right: 0;
+	width: 180px;
+	height: 180px;
+	background: radial-gradient(circle at top right, rgba(74, 222, 183, 0.15) 0%, transparent 60%);
+	pointer-events: none;
+	z-index: 0;
+}
+
+.amf-header {
+	padding: 20px 24px;
+	background: linear-gradient(135deg, rgba(20, 35, 33, 0.85) 0%, rgba(15, 28, 26, 0.95) 100%);
+	border-bottom: 1px solid rgba(74, 222, 183, 0.12);
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+	position: relative;
+	z-index: 1;
+}
+
+.amf-header::after {
+	content: '';
+	position: absolute;
+	bottom: 0;
+	left: 5%;
+	right: 5%;
+	height: 1px;
+	background: linear-gradient(90deg, transparent 0%, rgba(74, 222, 183, 0.4) 50%, transparent 100%);
+}
+
+.amf-title {
+	font-size: 11px;
+	font-weight: 500;
+	letter-spacing: 3px;
+	color: rgba(74, 222, 183, 0.7);
+	text-transform: uppercase;
+}
+
+.amf-search {
+	width: 100%;
+	padding: 11px 16px;
+	background: rgba(0, 0, 0, 0.5);
+	border: 1px solid rgba(74, 222, 183, 0.18);
+	border-radius: 8px;
+	color: #e0f0ee;
+	font-size: 14px;
+	outline: none;
+	transition: all 0.2s ease;
+}
+
+.amf-search::placeholder {
+	color: rgba(74, 222, 183, 0.4);
+}
+
+.amf-search:focus {
+	border-color: rgba(74, 222, 183, 0.4);
+	box-shadow: 0 0 0 3px rgba(74, 222, 183, 0.1);
+	background: rgba(0, 0, 0, 0.6);
+}
+
+.amf-status {
+	font-size: 12px;
+	color: rgba(74, 222, 183, 0.6);
+	text-align: center;
+}
+
+.amf-status-loading {
+	animation: pulse 2s ease-in-out infinite;
+}
+
+.amf-results {
+	flex: 1;
+	padding: 28px;
+	overflow-y: auto;
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+	gap: 26px;
+	align-content: start;
+}
+
+
+
+.amf-card {
+	background: linear-gradient(135deg, rgba(74, 222, 183, 0.05) 0%, rgba(42, 157, 143, 0.03) 100%);
+	border: 1px solid rgba(74, 222, 183, 0.18);
+	border-radius: 10px;
+	cursor: pointer;
+	transition: all 0.2s ease;
+	animation: fadeIn 0.3s ease;
+	display: flex;
+	flex-direction: column;
+	padding: 14px;
+	gap: 10px;
+	overflow: visible;
+}
+
+.amf-card-img-wrap {
+	width: 100%;
+	background: rgba(0, 0, 0, 0.35);
+	border-radius: 8px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 16px;
+	min-height: 220px;
+}
+
+
+.amf-card-img-wrap img {
+	display: block;
+	max-width: 100%;
+	height: auto;
+	width: auto;
+	object-fit: contain;
+	position: static;
+}
+
+
+
+.amf-card:hover {
+	transform: translateY(-4px);
+	box-shadow: 0 8px 24px rgba(74, 222, 183, 0.2);
+	border-color: rgba(74, 222, 183, 0.25);
+	background: linear-gradient(135deg, rgba(74, 222, 183, 0.08) 0%, rgba(42, 157, 143, 0.04) 100%);
+}
+
+.amf-card-matched {
+	border-color: rgba(74, 222, 183, 0.5);
+	box-shadow: 0 0 20px rgba(74, 222, 183, 0.4);
+	animation: pulse 1s ease-in-out infinite;
+}
+
+
+
+.amf-card-label {
+	font-size: 15px;
+	font-weight: 700;
+	color: #e0f0ee;
+	text-align: center;
+	line-height: 1.4;
+	white-space: normal;
+	word-break: break-word;
+	overflow: visible;
+}
+
+
+
+.amf-card-price {
+	padding: 0 14px 14px 14px;
+	font-size: 13px;
+	color: #4adeb7;
+	text-align: center;
+	font-weight: 700;
+}
+
+.amf-card-price span {
+	font-size: 14px;
+}
+
+.amf-close {
+	position: absolute;
+	top: 16px;
+	right: 16px;
+	width: 32px;
+	height: 32px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background: rgba(74, 222, 183, 0.1);
+	border: 1px solid rgba(74, 222, 183, 0.2);
+	border-radius: 50%;
+	color: #4adeb7;
+	font-size: 22px;
+	line-height: 1;
+	cursor: pointer;
+	transition: all 0.2s ease;
+	z-index: 2;
+}
+
+.amf-close:hover {
+	background: rgba(74, 222, 183, 0.2);
+	border-color: rgba(74, 222, 183, 0.4);
+	transform: scale(1.1);
+}
+
+.amf-loading {
+	grid-column: 1 / -1;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	padding: 60px 20px;
+	gap: 16px;
+}
+
+.amf-spinner {
+	width: 40px;
+	height: 40px;
+	border: 3px solid rgba(74, 222, 183, 0.2);
+	border-top: 3px solid #4adeb7;
+	border-radius: 50%;
+	animation: spin 0.8s linear infinite;
+}
+
+.amf-loading-text {
+	font-size: 14px;
+	color: rgba(74, 222, 183, 0.6);
+	font-weight: 500;
+}
+
+/* Scrollbar */
+.amf-results::-webkit-scrollbar {
+	width: 10px;
+}
+
+.amf-results::-webkit-scrollbar-track {
+	background: rgba(0, 0, 0, 0.3);
+}
+
+.amf-results::-webkit-scrollbar-thumb {
+	background: linear-gradient(180deg, rgba(74, 222, 183, 0.35) 0%, rgba(42, 157, 143, 0.35) 100%);
+	border-radius: 5px;
+	border: 2px solid transparent;
+	background-clip: padding-box;
+}
+
+.amf-results::-webkit-scrollbar-thumb:hover {
+	background: linear-gradient(180deg, rgba(74, 222, 183, 0.55) 0%, rgba(42, 157, 143, 0.55) 100%);
+	background-clip: padding-box;
+}
+
+@media (max-width: 768px) {
+	.amf-results {
+		grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+		gap: 12px;
+		padding: 16px;
+	}
+}
+`
+	document.head.appendChild(style)
+
+	window.addEventListener("load", () => {
+		setTimeout(() => {
+			enhanceAvatars()
+			setInterval(enhanceAvatars, 2000)
+		}, 800)
+	})
+
+	console.log('Avatar Marketplace Finder: Initialized')
+})();
