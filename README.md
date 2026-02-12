@@ -1,144 +1,117 @@
-# ⚡ Utilify
+# Utilify
 
-A modern, high-performance userscript suite for **KoGaMa** featuring a complete visual overhaul with an "Ethereal" aesthetic, enhanced UI components, and powerful utilities for profile customization and social features.
+A comprehensive userscript suite for **KoGaMa** designed to enhance user experience through visual modernization, privacy tools, and advanced profile customization.
 
-***
+Version **3.0.0** introduces a completely rewritten modular architecture, a new visual language inspired by *A: Endfield*, and an experimental plugin system.
 
-## 🛑 Safety & Compliance Notice
+---
 
-Utilify is a third-party extension. Users are solely responsible for its use and should adhere strictly to the platform's rules.
+## ⚠️ Compliance & Safety
 
-### Official KoGaMa Developer Guidelines
-The lead web developer at KoGaMa has stated that extensions are welcome as long as:
-1. **Privacy is respected:** No violation of other users' privacy.
-2. **Responsible API use:** No spam-polling (cache where sensible).
-3. **No client interference:** The extension must not interfere with the game client itself.
+Utilify is a third-party extension. Users are responsible for adhering to the platform's Terms of Service.
 
-> [!WARNING]  
-> **Risk Assessment:** Features under the "Use At Your Own Risk" section (UAOR) include network interception and frequent polling. While functional, they push the boundaries of these guidelines and should be used with caution.
+**KoGaMa Developer Guidelines:**
+1.  **Privacy:** Do not violate the privacy of other users.
+2.  **API Usage:** Do not spam-poll endpoints.
+3.  **Client Integrity:** Do not interfere with the game client logic.
 
-***
+> **Note on "UAOR" Features:**
+> Features marked as **Use At Your Own Risk** (Pulse Blocker, Friend Activity, Streak Keeper) interact with the API in ways that strictly edge the guidelines. These are disabled by default.
 
-## ✨ Highlights (V2.3)
+---
 
-### 🎨 Complete Visual Overhaul
-Experience a completely new "Ethereal" aesthetic with glassmorphism, gradients, and particle animations throughout the interface.
+## Patch Notes (v3.0.0)
 
-* **Glassmorphic UI:** Semi-transparent panels with backdrop blur and gradient borders
-* **Animated Elements:** Floating buttons, sparkle effects (✦ ✧), and smooth transitions
-* **Cohesive Color Scheme:** Deep dark blues (#1a1b1e) with pastel pink/purple accents (#ffc0cb, #c8bed8)
+### 🔧 Core System
+* **Rewrite:** The codebase has been refactored into a modular, object-oriented structure for better performance and easier maintenance.
+* **Plugin System (Beta):** Users can now load external scripts dynamically via the Settings panel.
+* **React Integration:** Improved input handling for the bio/description editor, fixing issues where text changes would not save.
 
-### 🔧 Enhanced Features
-* **Smart Link Obfuscation:** Automatically replaces dots with `%2E` in text fields (except whitelisted domains like YouTube)
-* **Feed Manager:** New ✦ button on profiles to view and manage your feed posts/comments with delete options
-* **Profile Effect Tooltips:** Floating tooltips when typing `filter:` to list available effects
+### 🎨 Visuals
+* **New Aesthetic:** Replaced the previous pink "Ethereal" theme with a Teal/Dark Gray theme inspired by *A: Endfield*.
+* **UI Cleanup:** Automatically removes visual clutter (useless footers, level displays, oversized badges) for a cleaner browsing experience.
+* **Glassmorphism:** Configurable glass-panel effects for UI elements.
 
-### 🌟 New Profile Effects
-* **Sparkles:** Floating particle system with shimmering effects
-* **September:** Combined rain and sparkles for an autumn aesthetic
-* **Imgur Backgrounds:** Support for external images via `Background: imgur:IMAGE_ID`
+### ✨ Profile Customization
+* **Effect Engine:** New particle rendering system supporting:
+    * `rain`, `snow`, `fireflies`, `roses`, `sparkles`.
+* **Modifiers:** Added `blur` and `dark` filters for background images.
+* **Syntax:** Updated description syntax for easier application:
+    * `Background: i-IMGUR_ID, filter: rain, dark`
 
-***
+---
 
-## 🚀 Key Features
+## Features
 
-* **Profile Customization:** Client-side rendering of Rain, Snow, Fireflies, Roses, Sparkles, and September effects
-* **Smart URL Tools:** Automatic link obfuscation to bypass filters
-* **Bio Utilities:** Quick-copy button and "📜 Archive" shortcut for the Wayback Machine
-* **Friends List Search:** Real-time filtering with glassmorphic UI
-* **Custom Styling:** Support for `linear-gradient` backgrounds and global CSS injection
-* **Feed Management:** Delete individual or all posts/comments from your profile feed
+### Utilities
+| Feature | Description |
+| :--- | :--- |
+| **Feed Manager** | A dedicated card on the profile to view, manage, and batch-delete feed posts and comments. |
+| **Marketplace Finder** | Quickly locate avatars in the marketplace directly from a user's profile list. |
+| **Seamless Description** | Replaces the default truncated bio with a scrollable, fully decoded text box. |
+| **Smart Obfuscation** | Automatically converts dots to `%2E` in text inputs to bypass filters (whitelists YouTube/Fonts). |
+| **Archive Shortcut** | Adds a direct link to the Wayback Machine for the current profile. |
 
-***
+### Visual Enhancements
+* **Custom Gradients:** Apply global CSS gradients to the site background.
+* **Custom Fonts:** Load Google Fonts (e.g., Roboto, Comfortaa) or custom URLs.
+* **Leaderboard Fix:** Corrects the API calls for the "Around Me" leaderboard view.
+* **Player Chip:** Displays a breakdown of Members vs. Tourists on game pages.
 
-## 🛠️ Installation Guide
+### Social Tools
+* **Friend Activity:** passively monitors friend list updates to show what game or project they are currently in.
+* **Pulse Blocker:** Blocks outgoing "pulse" requests to appear offline to others.
+* **Streak Keeper:** Automates chat messages to a specific bot account to maintain streaks (UAOR).
 
-### Step 1: Install a Userscript Manager
-While Tampermonkey is the traditional choice, we highly recommend **ScriptCat** for better performance and modern feature support.
+---
 
-* **Recommended:** [**ScriptCat**](https://scriptcat.org/) (Modern & Optimized)
-* **Alternative:** [Tampermonkey](https://www.tampermonkey.net/)
+## Configuration
 
-### Step 2: Install Utilify
-Once your manager is ready, click the link below to install:
-👉 [**Install Utilify (Ethereal Edition)**](https://github.com/gxthickitty/Utilify/raw/refs/heads/main/Script/Rewrite/Utilify.user.js)
+To apply background effects, add the following syntax to your **Profile Description**:
 
-***
+**Format:**
+`Background: SOURCE, filter: EFFECTS`
 
-## ⚙️ Configuration & Usage
+**Examples:**
+* **Imgur Image:** `Background: i-aBcDeFg`
+* **Game Image:** `Background: 1234567`
+* **With Effects:** `Background: i-aBcDeFg, filter: rain, blur`
 
-### Profile Backgrounds
-Apply custom backgrounds using tags in your profile bio:
+**Available Filters:**
+`rain` `snow` `fireflies` `roses` `sparkles` `blur` `dark`
 
-* **Gradients:** `Background: linear-gradient(45deg, #ff0000, #0000ff)`
-* **Imgur Images:** `Background: imgur:aBcDeFg`
-* **Multiple Effects:** `background:i-IMGID,filter:roses,rain;`
+> **Tip:** Typing `filter:` in your description box will trigger a helper tooltip listing available effects.
 
-### Available Filters
-- `rain` - Raindrops falling
-- `snow` - Snowflakes drifting
-- `fireflies` - Pulsing light particles
-- `roses` - Falling floral animation
-- `sparkles` - Shimmering particle effects
-- `september` - Combined rain and sparkles
+---
 
-### Smart Obfuscation
-Simply type or paste a URL into any text field. Dots will automatically be converted to `%2E` except for whitelisted domains (YouTube, etc.).
+## Installation
 
-***
+1.  **Manager:** Install a userscript manager. **ScriptCat** is recommended for best compatibility, though Tampermonkey is supported.
+2.  **Install:** Click the link below to install the script.
 
-## 🔄 Update Log
+[**👉 Install Utilify v3.0.0**](https://github.com/lappisu/Utilify/raw/refs/heads/main/Script/Rewrite/Utilify.user.js)
 
-### **v2.3.0** *(Current)*
-* **COMPLETE REWRITE:** Object-oriented codebase with UI, Storage, and RiskyFeatures objects
-* **VISUAL OVERHAUL:** New "Ethereal" aesthetic with glassmorphism, gradients, and animations
-* **NEW SETTINGS PANEL:** Draggable, animated panel with contributor credits and improved organization
-* **NEW FEATURES:**
-  - Feed Manager for deleting posts/comments
-  - Profile effect tooltips
-  - Sparkles and September particle effects
-  - Smart automatic link obfuscation
-* **UI ENHANCEMENTS:**
-  - Floating settings button with rotating star (✦)
-  - Redesigned contributor badge as shimmering card
-  - Animated tabs and buttons throughout
-* **REMOVED:** Mass purchase tool (Auto Buyer) and Ivy effect
-* **REPOSITORY CHANGE:** Now maintained at `gxthickitty/Utilify`
+---
 
-### **v2.1.0 -- December 2025**
-* **NEW:** Integrated Search Bar for the Friends list
-* **NEW:** Support for Imgur IDs in the Background system (`imgur:ID`)
-* **NEW:** Added **Roses** and **Ivy** particle effects
-* **IMPROVED:** URL Obfuscation button moved inside input fields
-* **IMPROVED:** Optimized Firefly system with pulsing glow effects
+## Contributors
 
-### **v2.0.9**
-* Core rewrite release including CSS fixes for glass panels
-* Fixed AvatarFinder logic and improved bio-copy selectors
-* Introduced initial background effects: Snow, Rain, Fireflies, and Blur
+Special thanks to the community members who helped shape Utilify.
 
-***
+| Contributor | Contribution / Role |
+| :--- | :--- |
+| **Simon** | Lead Developer, Core Maintainer |
+| **Death Wolf.** | Leading motivation behind the whole project |
+| **Zpayer** | Leaderboard API Fix implementation & various ideas |
+| **Snowy** | Feedback & Bug Reports |
+| **Awoi** | Help with porting some KB feature |
+| **Tungsten** | Feedback |
+| **Raptor** | Testing & Feedback |
+| **Comenxo** | Testing & Feedback |
+| **Idealism** | Feedback, Avatar Search  |
+| **Selene** | Feedback, Avatar Search  |
+| **ReZa** | Testing & Feedback |
+| **ValDon** | Feedback |
 
-## ⚠️ Use At Your Own Risk (UAOR) Features
+---
 
-These features are functional but push the boundaries of KoGaMa's extension guidelines:
-
-* **Pulse Blocker:** Appear offline by intercepting network requests
-* **Friend Activity:** Monitor friend game/project links via observation
-* **Player Type Display:** Show Global/Players/Tourists chip on game pages
-* **Streak Keeper:** Automate chat messages to specific bot accounts
-
-> [!WARNING]
-> I am not responsible for any inappropriate content (including NSFW images) set via the Imgur background system. Use external image hosting at your own discretion.
-
-***
-## 👥 Credits
-
-**Developer:** Simon (`gxthickitty`)  
-**Contributors:** Death Wolf, Snowy, Awoi, and other community members
-
-*Utilify is not affiliated with or endorsed by KoGaMa.*
-
-
-
-<img width="1885" height="1042" alt="{846F2600-EA2E-4AD8-A67F-3F19DAB04651}" src="https://github.com/user-attachments/assets/d47cdc60-32d9-4be6-8e80-cafa8623293b" />
+*Utilify is an independent project and is not affiliated with or endorsed by KoGaMa.*
