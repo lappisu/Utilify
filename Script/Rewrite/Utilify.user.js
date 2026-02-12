@@ -6,15 +6,11 @@
 // @author       Simon
 // @match        *://www.kogama.com/*
 // @icon         https://avatars.githubusercontent.com/u/143356794?v=4
-// @grant        GM_info
-// @grant        GM_addStyle
-// @grant        GM_getValue
-// @grant        GM_setValue
-// @grant        GM_xmlhttpRequest
-// @grant        GM_setClipboard
 // @connect      fonts.googleapis.com
 // @connect      kogama.com
 // @run-at       document-start
+// @grant        none
+// @noframes
 // ==/UserScript==
 
 // CSS: Custom Layouts and improvements
