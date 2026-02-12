@@ -2,7 +2,7 @@
 
 A comprehensive userscript suite for **KoGaMa** designed to enhance user experience through visual modernization, privacy tools, and advanced profile customization.
 
-Version **3.0.0** introduces a completely rewritten modular architecture, a new visual language inspired by *A: Endfield*, and an experimental plugin system.
+Version **3.0.0** introduces a completely rewritten modular architecture, a new visual language and an experimental plugin system.
 
 ---
 
