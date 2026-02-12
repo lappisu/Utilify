@@ -103,7 +103,7 @@ Special thanks to the community members who helped shape Utilify.
 | **Death Wolf.** | Leading motivation behind the whole project |
 | **Zpayer** | Leaderboard API Fix implementation & various ideas |
 | **Snowy** | Feedback & Bug Reports |
-| **Awoi** | Help with porting some KB feature |
+| **Awoi** | Help with porting various KB features |
 | **Tungsten** | Feedback |
 | **Raptor** | Testing & Feedback |
 | **Comenxo** | Testing & Feedback |
