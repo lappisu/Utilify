@@ -3,7 +3,7 @@
 # Utilify
 </div>
 
-<img width="1881" height="1044" alt="{88950E74-C0CC-4839-930B-D4CCD23FC60F}" src="https://github.com/user-attachments/assets/04e6d1c0-2b1b-4548-91d7-2cede9ef136a" />
+<img width="1890" height="1070" alt="{57ECA78E-390A-497C-BD49-B5B6E725E36F}" src="https://github.com/user-attachments/assets/a9d54157-6fae-4a39-9932-edae51f203b5" />
 
 A comprehensive userscript suite for **KoGaMa** designed to enhance user experience through visual modernization, privacy tools, and advanced profile customization.
 
