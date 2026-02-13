@@ -94,7 +94,7 @@ To apply background effects, add the following syntax to your **Profile Descript
 1.  **Manager:** Install a userscript manager. **ScriptCat** is recommended for best compatibility, though Tampermonkey is supported.
 2.  **Install:** Click the link below to install the script.
 
-[**👉 Install Utilify v3.0.0**](https://github.com/lappisu/Utilify/raw/refs/heads/main/Script/Rewrite/Utilify.user.js)
+[**👉 Install Utilify v3.0.3**](https://github.com/lappisu/Utilify/raw/refs/heads/main/Script/Rewrite/Utilify.user.js)
 
 ---
 
