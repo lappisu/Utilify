@@ -106,15 +106,16 @@ Special thanks to the community members who helped shape Utilify.
 | :--- | :--- |
 | **Simon** | Lead Developer, Core Maintainer |
 | **Death Wolf.** | Leading motivation behind the whole project |
+| **Sorry** | Testing, Feedback, Suggestions, Design (CSS) Feedback and adjustements |
 | **Zpayer** | Leaderboard API Fix implementation & various ideas |
-| **Snowy** | Feedback & Bug Reports |
 | **Awoi** | Help with porting various KB features |
-| **Tungsten** | Feedback |
-| **Raptor** | Testing & Feedback |
-| **Comenxo** | Testing & Feedback |
 | **Idealism** | Feedback, Avatar Search  |
 | **Selene** | Feedback, Avatar Search  |
+| **Snowy** | Feedback & Bug Reports |
+| **Comenxo** | Testing & Feedback |
+| **Raptor** | Testing & Feedback |
 | **ReZa** | Testing & Feedback |
+| **Tungsten** | Feedback |
 | **ValDon** | Feedback |
 
 ---
