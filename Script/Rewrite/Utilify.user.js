@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Utilify 
 // @namespace    author @ simonvs (UID: 970332627221504081)
-// @version      3.0.0
+// @version      3.0.3
 // @description  (Almost) personal userscript inspired by KoGaMaBuddy containing various utilities and visual enhancements. 
 // @author       Simon
 // @match        *://www.kogama.com/*
@@ -29,7 +29,72 @@
         .css-1hitfzb, .css-1q1eu9e { color: #4adeb7 !important; } /* Feed & comment author usernames + some button text idk*/
         .css-1995t1d, .css-e5yc1l { background-color: transparent !important; } /* kill the annoying orange badges */
         ._2hUvr ._1T9vj, ._3-qgq ._2uIZL { background-color:hsla(0, 0%, 0%, 0.6) !important; backdrop-filter: blur(5px) !important; } /* titles on avatar cards */
-    
+        /* DM CHAT BOX */
+        .zUJzi, ._375XK, ._375XK ._2drTe, .zUJzi .o_DA6 .uwn5j { border: none !important; background-color: rgba(0, 0, 0, 0.3) !important; backdrop-filter: blur(6px) !important; }
+        .zUJzi .o_DA6 .uwn5j ._3DYYr:hover { background-color: rgba(20, 80, 80, 0.2) !important; } /* chat-selector hover */
+        ._375XK .F3PyX { border: none !important; }
+        .zUJzi .o_DA6 .uwn5j ._3DYYr._2dPu4 { 
+        background-color: rgba(20, 80, 80, 0.5) !important; 
+        border-left: 3px solid rgba(100, 200, 200, 0.9) !important;
+        padding-left: 12px !important;
+        }
+        .uwn5j ._3DYYr ._1j2Cd { 
+        filter: blur(5px); 
+        transition: filter 0.3s ease-in-out !important;
+        }
+
+        .uwn5j ._3DYYr:hover ._1j2Cd { 
+        filter: blur(0px) !important;
+        }
+        /* Incoming messages (sent to us) */
+        ._375XK ._2XaOw ._1j2Cd p {
+        background-color: rgba(20, 80, 80, 0.7) !important;
+        border: 1px solid rgba(100, 200, 200, 0.4) !important;
+        border-radius: 8px !important;
+        backdrop-filter: blur(10px) !important;
+        padding: 10px 14px !important;
+        color: white !important;
+        position: relative !important;
+        }
+
+        ._375XK ._2XaOw ._1j2Cd p::before {
+        content: "Them" !important;
+        position: absolute !important;
+        top: -10px !important;
+        left: 8px !important;
+        font-size: 6px !important;
+        color: rgba(100, 200, 200, 0.9) !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.5px !important;
+        padding: 2px 6px !important;
+        border-radius: 3px !important;
+        z-index: 10 !important;
+        }
+
+        /* Outgoing messages (sent by us) */
+        ._375XK ._2XaOw ._1j2Cd._1Xzzq p {
+        background-color: rgba(30, 90, 90, 0.65) !important;
+        border: 1px solid rgba(120, 220, 220, 0.35) !important;
+        border-radius: 8px !important;
+        backdrop-filter: blur(10px) !important;
+        padding: 10px 14px !important;
+        color: white !important;
+        position: relative !important;
+        }
+
+        ._375XK ._2XaOw ._1j2Cd._1Xzzq p::before {
+        content: "You" !important;
+        position: absolute !important;
+        top: -10px !important;
+        right: 8px !important;
+        font-size: 6px !important;
+        color: rgba(120, 220, 220, 0.9) !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.5px !important;
+        padding: 2px 6px !important;
+        border-radius: 3px !important;
+        z-index: 10 !important;
+        }
     `;
     document.documentElement.appendChild(style);
 })();
@@ -1500,7 +1565,7 @@
         }
         const { radius, hue, alpha } = cfg.glassPanels;
         this.inject('utilify_glass', `
-          ._3TORb ._2E1AL .tRx6U, .css-1wbcikz, .css-wog98n, .css-o4yc28, .css-z05bui, ._1q4mD {
+          ._3TORb ._2E1AL .tRx6U, .css-1wbcikz, .css-wog98n, .css-o4yc28, .css-z05bui, ._1q4mD, .css-e8xqt2, .css-yrsbmg, .css-ry78up {
             background-color: hsla(${hue},65%,40%,${alpha}) !important;
             backdrop-filter: blur(8px) !important;
             border-radius: ${radius}px !important;
@@ -6360,4 +6425,444 @@ av:hover {
 	})
 
 	console.log('Avatar Marketplace Finder: Initialized')
+})();
+
+(() => {
+  "use strict";
+  const STATE = { query: "", hiddenElements: new Map() };
+  const SEL = {
+    toolbar: "div._6cutH",
+    listRoot: "div._1Yhgq",
+    item: "div._1lvYU",
+    name: "div._3zDi-"
+  };
+
+  const applyFilter = () => {
+    const q = STATE.query;
+    const listRoot = document.querySelector(SEL.listRoot);
+    if (!listRoot) return;
+    if (!q || q === "") {
+      STATE.hiddenElements.forEach((value, item) => {
+        const { parent, nextSibling } = value;
+        if (parent && document.contains(parent)) {
+          if (nextSibling && nextSibling.parentElement === parent) {
+            parent.insertBefore(item, nextSibling);
+          } else {
+            parent.appendChild(item);
+          }
+        }
+      });
+      STATE.hiddenElements.clear();
+      return;
+    }
+
+    const allItems = [
+      ...document.querySelectorAll(SEL.item),
+      ...Array.from(STATE.hiddenElements.keys())
+    ];
+
+    allItems.forEach(item => {
+      const name =
+        item.querySelector(SEL.name)?.textContent.toLowerCase() ?? "";
+      const visible = name.includes(q);
+
+      if (!visible) {
+        if (!STATE.hiddenElements.has(item) && item.parentElement) {
+          STATE.hiddenElements.set(item, {
+            parent: item.parentElement,
+            nextSibling: item.nextSibling
+          });
+          item.remove();
+        }
+      } else {
+        if (STATE.hiddenElements.has(item)) {
+          const { parent, nextSibling } = STATE.hiddenElements.get(item);
+          if (parent && document.contains(parent)) {
+            if (nextSibling && nextSibling.parentElement === parent) {
+              parent.insertBefore(item, nextSibling);
+            } else {
+              parent.appendChild(item);
+            }
+          }
+          STATE.hiddenElements.delete(item);
+        }
+      }
+    });
+  };
+
+  const injectSearchBar = toolbar => {
+    if (toolbar.querySelector("#kogama-friend-filter")) return;
+    
+    const input = document.createElement("input");
+    input.id = "kogama-friend-filter";
+    input.type = "search";
+    input.placeholder = "Filter friends";
+    
+    Object.assign(input.style, {
+      marginLeft: "12px",
+      padding: "8px 12px",
+      height: "36px",
+      minWidth: "200px",
+      borderRadius: "8px",
+      border: "1px solid rgba(255, 255, 255, 0.2)",
+      backgroundColor: "rgba(0, 0, 0, 0.3)",
+      backdropFilter: "blur(6px)",
+      WebkitBackdropFilter: "blur(6px)",
+      color: "#fff",
+      fontSize: "14px",
+      fontWeight: "400",
+      outline: "none",
+      transition: "all 220ms cubic-bezier(0.4, 0, 0.2, 1)",
+      boxShadow: "0 2px 8px rgba(0, 0, 0, 0.1)"
+    });
+
+    input.addEventListener("focus", () => {
+      input.style.backgroundColor = "rgba(0, 0, 0, 0.4)";
+      input.style.border = "1px solid rgba(255, 255, 255, 0.35)";
+      input.style.boxShadow = "0 4px 12px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(255, 255, 255, 0.1)";
+    });
+
+    input.addEventListener("blur", () => {
+      input.style.backgroundColor = "rgba(0, 0, 0, 0.3)";
+      input.style.border = "1px solid rgba(255, 255, 255, 0.2)";
+      input.style.boxShadow = "0 2px 8px rgba(0, 0, 0, 0.1)";
+    });
+
+    const handleInput = (e) => {
+      const newQuery = e.target.value.trim().toLowerCase();
+      STATE.query = newQuery;
+      applyFilter();
+    };
+
+    input.addEventListener("input", handleInput);
+    input.addEventListener("search", handleInput);
+    input.addEventListener("change", handleInput);
+
+    toolbar.appendChild(input);
+  };
+
+  const observeFriendsList = root => {
+    if (root.__filterObserver) return;
+    root.__filterObserver = true;
+    new MutationObserver(() => {
+      if (STATE.query) {
+        applyFilter();
+      }
+    }).observe(root, {
+      childList: true,
+      subtree: true
+    });
+  };
+
+  const observeToolbar = parent => {
+    const observer = new MutationObserver(() => {
+      const toolbar = parent.querySelector(SEL.toolbar);
+      if (!toolbar) return;
+      injectSearchBar(toolbar);
+    });
+    observer.observe(parent, { childList: true, subtree: true });
+    const toolbar = parent.querySelector(SEL.toolbar);
+    if (toolbar) injectSearchBar(toolbar);
+  };
+
+  const bootstrap = () => {
+    const listRoot = document.querySelector(SEL.listRoot);
+    if (!listRoot) return;
+    
+    observeFriendsList(listRoot);
+    observeToolbar(listRoot.parentElement);
+    applyFilter();
+  };
+
+  bootstrap();
+  new MutationObserver(bootstrap).observe(document.documentElement, {
+    childList: true,
+    subtree: true
+  });
+})();
+
+(function () { // avatar pages | suggestion & base code by Sorry
+    'use strict';
+    function init() {
+        const API = "https://www.kogama.com/model/market/";
+        let currentPage = 1;
+        let itemsPerPage = 48;
+        const MAX_PAGE = 208;
+
+        if (!window.location.pathname.match(/^\/marketplace\/avatar\/?$/)) return;
+    function waitForElement(selector, callback) {
+        const el = document.querySelector(selector);
+        if (el) return callback(el);
+        
+        const observer = new MutationObserver(() => {
+            const el = document.querySelector(selector);
+            if (el) {
+                observer.disconnect();
+                callback(el);
+            }
+        });
+        if (document.body) {
+            observer.observe(document.body, { childList: true, subtree: true });
+        } else {
+            document.addEventListener('DOMContentLoaded', () => {
+                observer.observe(document.body, { childList: true, subtree: true });
+            });
+        }
+    }
+
+    waitForElement('.MuiTablePagination-toolbar', (originalPagination) => {
+        const ui = document.createElement("div");
+        ui.innerHTML = `
+            <div class="km-controls">
+                <button class="km-btn km-prev" title="Previous Page">
+                    <svg viewBox="0 0 24 24" width="18" height="18">
+                        <path d="M15 6L9 12L15 18" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </button>
+                
+                <div class="km-inputs">
+                    <div class="km-input-wrapper" data-label="page">
+                        <input class="km-page" type="number" min="1" max="${MAX_PAGE}" value="1">
+                    </div>
+                    <div class="km-input-wrapper" data-label="amount">
+                        <input class="km-count" type="number" min="10" max="100" step="12" value="48">
+                    </div>
+                </div>
+
+                <button class="km-btn km-next" title="Next Page">
+                    <svg viewBox="0 0 24 24" width="18" height="18">
+                        <path d="M9 6L15 12L9 18" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="km-footer">Page ${MAX_PAGE} is the last valid page</div>
+        `;
+
+        const style = document.createElement("style");
+        style.textContent = `
+            .km-controls {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                padding: 12px 20px;
+                background: linear-gradient(135deg, rgba(0, 0, 0, 0.50), rgba(0, 0, 0, 0.60));
+                backdrop-filter: blur(12px);
+                border: 1px solid rgba(94, 234, 212, 0.3);
+                border-radius: 16px;
+                box-shadow: 0 8px 32px rgba(20, 184, 166, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            }
+
+            .km-btn {
+                background: rgba(20, 184, 166, 0.2);
+                border: 1px solid rgba(94, 234, 212, 0.3);
+                padding: 10px 12px;
+                border-radius: 10px;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: #5eead4;
+                transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+                backdrop-filter: blur(8px);
+            }
+
+            .km-btn:hover:not(:disabled) {
+                background: rgba(20, 184, 166, 0.35);
+                border-color: rgba(94, 234, 212, 0.5);
+                transform: translateY(-1px);
+                box-shadow: 0 4px 12px rgba(20, 184, 166, 0.3);
+            }
+
+            .km-btn:active:not(:disabled) {
+                transform: translateY(0);
+            }
+
+            .km-btn:disabled {
+                opacity: 0.4;
+                cursor: not-allowed;
+            }
+
+            .km-inputs {
+                display: flex;
+                gap: 12px;
+            }
+
+            .km-input-wrapper {
+                position: relative;
+                display: flex;
+                flex-direction: column;
+            }
+
+            .km-input-wrapper::before {
+                content: attr(data-label);
+                position: absolute;
+                top: -12px;
+                left: 12px;
+                font-size: 9px;
+                font-weight: 500;
+                color: rgba(94, 234, 212, 0.7);
+                text-transform: uppercase;
+                letter-spacing: 1px;
+                z-index: 10;
+                pointer-events: none;
+            }
+
+            .km-page, .km-count {
+                width: 70px;
+                padding: 10px 12px;
+                font-size: 14px;
+                font-weight: 500;
+                text-align: center;
+                border: 1px solid rgba(94, 234, 212, 0.3);
+                border-radius: 10px;
+                background: rgba(255, 255, 255, 0.08);
+                color: #f0fdfa;
+                outline: none;
+                transition: all 0.2s ease;
+                backdrop-filter: blur(8px);
+            }
+
+            .km-page:focus, .km-count:focus {
+                background: rgba(255, 255, 255, 0.12);
+                border-color: rgba(94, 234, 212, 0.6);
+                box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.15);
+            }
+
+            .km-footer {
+                margin-top: 8px;
+                padding: 6px 12px;
+                font-size: 11px;
+                text-align: center;
+                color: rgba(240, 253, 250, 0.7);
+                background: linear-gradient(135deg, rgba(0, 0, 0, 0.50), rgba(0, 0, 0, 0.60));
+                border-radius: 8px;
+                border: 1px solid rgba(94, 234, 212, 0.2);
+                backdrop-filter: blur(6px);
+            }
+
+            .km-page::-webkit-inner-spin-button,
+            .km-page::-webkit-outer-spin-button,
+            .km-count::-webkit-inner-spin-button,
+            .km-count::-webkit-outer-spin-button {
+                -webkit-appearance: none;
+                margin: 0;
+            }
+            .km-page, .km-count {
+                -moz-appearance: textfield;
+            }
+        `;
+        document.head.appendChild(style);
+        originalPagination.remove();
+        const containerStyle = document.createElement("style");
+        containerStyle.textContent = `
+            .km-floating-container {
+                position: fixed;
+                bottom: 24px;
+                left: 50%;
+                transform: translateX(-50%);
+                z-index: 999999;
+                display: flex;
+                flex-direction: column;
+                gap: 8px;
+                align-items: center;
+            }
+        `;
+        document.head.appendChild(containerStyle);
+        
+        const container = document.createElement("div");
+        container.className = "km-floating-container";
+        container.appendChild(ui);
+        document.body.appendChild(container);
+
+        const prevBtn = ui.querySelector('.km-prev');
+        const nextBtn = ui.querySelector('.km-next');
+        const pageInput = ui.querySelector('.km-page');
+        const countInput = ui.querySelector('.km-count');
+        async function loadPage(page, count = itemsPerPage) {
+            if (page < 1 || page > MAX_PAGE) return;
+
+            currentPage = page;
+            itemsPerPage = Math.max(10, Math.min(100, count));
+            
+            pageInput.value = page;
+            countInput.value = itemsPerPage;
+            prevBtn.disabled = page <= 1;
+            nextBtn.disabled = page >= MAX_PAGE;
+
+            const url = `${API}?page=${page}&count=${itemsPerPage}&order=undefined&category=avatar&popular=1`;
+
+            try {
+                const res = await fetch(url, { credentials: "include" });
+                const json = await res.json();
+                if (!json.data) return;
+
+                const grid = document.querySelector('[class*="MuiGrid-container"]');
+                if (!grid) return;
+
+                grid.innerHTML = "";
+
+                json.data.forEach(item => {
+                    const link = document.createElement("a");
+                    link.href = `/marketplace/avatar/a-${item.id}/`;
+                    link.className = 'MuiGrid-root MuiGrid-item';
+                    link.style.cssText = 'text-decoration: none; color: inherit; max-width: 120px; margin: 8px;';
+
+                    const imgWrapper = document.createElement("div");
+                    imgWrapper.style.cssText = 'position: relative; border-radius: 8px; overflow: hidden;';
+                    
+                    const img = document.createElement("img");
+                    img.src = item.image_large || item.image_medium || item.image_small;
+                    img.style.cssText = 'width: 100%; display: block;';
+                    img.alt = item.name || 'Avatar';
+                    
+                    const nameDiv = document.createElement("div");
+                    nameDiv.textContent = item.name || 'Unnamed';
+                    nameDiv.style.cssText = 'margin-top: 6px; font-size: 12px; color: #e0e0e0; text-align: center; font-weight: 400; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;';
+
+                    imgWrapper.appendChild(img);
+                    link.appendChild(imgWrapper);
+                    link.appendChild(nameDiv);
+                    grid.appendChild(link);
+                });
+            } catch (err) {
+                console.error('KoGama Pagination Error:', err);
+            }
+        }
+
+        prevBtn.onclick = () => loadPage(currentPage - 1, itemsPerPage);
+        nextBtn.onclick = () => loadPage(currentPage + 1, itemsPerPage);
+
+        pageInput.addEventListener('keydown', e => {
+            if (e.key === 'Enter') {
+                const page = parseInt(pageInput.value);
+                if (page > 0 && page <= MAX_PAGE) loadPage(page, itemsPerPage);
+            }
+        });
+
+        pageInput.addEventListener('blur', () => {
+            const page = parseInt(pageInput.value);
+            if (page > 0 && page <= MAX_PAGE) loadPage(page, itemsPerPage);
+        });
+
+        countInput.addEventListener('keydown', e => {
+            if (e.key === 'Enter') {
+                const count = parseInt(countInput.value);
+                loadPage(currentPage, count);
+            }
+        });
+
+        countInput.addEventListener('blur', () => {
+            const count = parseInt(countInput.value);
+            loadPage(currentPage, count);
+        });
+        loadPage(1, 50);
+    });
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
+
 })();
