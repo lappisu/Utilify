@@ -1,3 +1,10 @@
+// Title * Translator
+// Desc * A basic one-way translator using Google Auto Detect API
+// Ver * 1.0.0
+// Date * 19 Feb 2026
+// Auth * Haden, Simon  <- two here
+
+
 // Based on Haden's public script:
 //   greasyfork.org/en/scripts/563386-kogama-chat-translator
 // I have been given permission to implement my own approach and use in any way I want.
