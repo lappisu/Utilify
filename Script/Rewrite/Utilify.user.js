@@ -981,7 +981,7 @@ function removeTooltip() {
       STYLE_ID: 'utilify_style',
       STORAGE_KEY: 'UtilifyConfig',
       PLUGINS_KEY: 'UtilifyPlugins',
-      UPDATE_URL: 'https://raw.githubusercontent.com/gxthickitty/Utilify/main/Script/Rewrite/Utilify.user.js',
+      UPDATE_URL: 'https://raw.githubusercontent.com/lappisu/Utilify/main/Script/Rewrite/Utilify.user.js',
       
       defaults: {
         gradient: null,
@@ -2378,7 +2378,7 @@ function removeTooltip() {
               <p class="small-note" style="font-size:13px; line-height:1.8; margin-bottom:24px;">
                 Made by Community For Community.<br>
                 Design inspired by Zhuang Fangyi from A: Endfield<br><br>
-                Fully maintained by <a href="https://www.github.com/gxthickitty/utilify" target="_blank">Simon</a>
+                Fully maintained by <a href="https://www.github.com/lappisu/utilify" target="_blank">Simon</a>
               </p>
               <div style="border-top:1px solid rgba(74, 222, 183, 0.15); padding-top:20px;">
                 <h4 style="color:#6ef0cb; font-size:14px; margin-bottom:16px;">Contributors</h4>
