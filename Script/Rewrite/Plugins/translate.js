@@ -1,6 +1,6 @@
 // Title * Translator
 // Desc * A basic one-way translator using Google Auto Detect API
-// Ver * 1.0.0
+// Ver * 1.0.1
 // Date * 19 Feb 2026
 // Auth * Haden, Simon
 
@@ -51,13 +51,13 @@
         'script', 'style', 'code', 'pre', 'svg', 'path',
         'input[type="password"]', 'input[type="email"]',
         '[contenteditable="true"]', '[data-no-translate]',
-        '.translation-label' // Exclude our own translation labels
+        '.translation-label'
     ];
 
     function detectUserLocale() {
         try {
             if (window.App && window.App.options && window.App.options.bootstrap) {
-                const locale = window.App.options.bootstrap.locale || 
+                const locale = window.App.options.bootstrap.locale ||
                               window.App.options.bootstrap.current_user?.language;
                 if (locale) {
                     console.log('[Auto-Translator] Detected locale from App:', locale);
@@ -75,8 +75,6 @@
                     }
                 }
             }
-
-            // Fallback to browser language
             const browserLang = navigator.language || navigator.userLanguage;
             console.log('[Auto-Translator] Using browser language:', browserLang);
             return browserLang;
@@ -87,13 +85,12 @@
     }
 
     function getLanguageFromLocale(locale) {
-        // Extract language code from locale (e.g., 'en_US' -> 'en')
         const langCode = LOCALE_TO_LANG[locale] || locale.split('_')[0].toLowerCase();
         return langCode;
     }
 
     function getCacheKey(text, lang) {
-        return `${lang}:${text.substring(0, 100)}`; // Use first 100 chars as key
+        return `${lang}:${text.substring(0, 100)}`;
     }
 
     function getCachedTranslation(text, lang) {
@@ -103,8 +100,6 @@
     function setCachedTranslation(text, lang, translation) {
         const key = getCacheKey(text, lang);
         translationCache.set(key, translation);
-        
-        // Limit cache size to 1000 entries
         if (translationCache.size > 1000) {
             const firstKey = translationCache.keys().next().value;
             translationCache.delete(firstKey);
@@ -120,33 +115,18 @@
 
         const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${targetLang}&dt=t&q=${encodeURIComponent(text)}`;
 
-        GM_xmlhttpRequest({
-            method: "GET",
-            url,
-            timeout: 5000,
-            onload: response => {
-                try {
-                    const data = JSON.parse(response.responseText);
-                    const translation = data[0].map(x => x[0]).join("");
-                    const detected = data[2];
-                    
-                    setCachedTranslation(text, targetLang, { translation, detected });
-                    
-                    callback(translation, detected);
-                } catch (e) {
-                    console.error('[Auto-Translator] Translation error:', e);
-                    callback(text, targetLang);
-                }
-            },
-            onerror: () => {
-                console.error('[Auto-Translator] Network error');
+        fetch(url)
+            .then(r => r.json())
+            .then(data => {
+                const translation = data[0].map(x => x[0]).join("");
+                const detected = data[2];
+                setCachedTranslation(text, targetLang, { translation, detected });
+                callback(translation, detected);
+            })
+            .catch(e => {
+                console.error('[Auto-Translator] Translation error:', e);
                 callback(text, targetLang);
-            },
-            ontimeout: () => {
-                console.error('[Auto-Translator] Translation timeout');
-                callback(text, targetLang);
-            }
-        });
+            });
     }
 
     function createTranslationLabel(sourceLang, element) {
@@ -166,24 +146,22 @@
             cursor: pointer;
             user-select: none;
         `;
-        
+
         const langName = LANG_NAMES[sourceLang] || sourceLang.toUpperCase();
         label.innerHTML = `Translated from ${langName} • <span style="text-decoration: underline;">Show original</span>`;
-        
+
         let showingOriginal = false;
         label.onclick = (e) => {
             e.stopPropagation();
             showingOriginal = !showingOriginal;
-            
+
             if (showingOriginal) {
-                // Show original
                 const textNode = Array.from(element.childNodes).find(n => n.nodeType === Node.TEXT_NODE);
                 if (textNode && element.dataset.originalText) {
                     textNode.textContent = element.dataset.originalText;
                 }
                 label.innerHTML = `Translated from ${langName} • <span style="text-decoration: underline;">Show translation</span>`;
             } else {
-                // Show translation
                 const textNode = Array.from(element.childNodes).find(n => n.nodeType === Node.TEXT_NODE);
                 if (textNode && element.dataset.translatedText) {
                     textNode.textContent = element.dataset.translatedText;
@@ -191,7 +169,7 @@
                 label.innerHTML = `Translated from ${langName} • <span style="text-decoration: underline;">Show original</span>`;
             }
         };
-        
+
         return label;
     }
 
@@ -221,7 +199,7 @@
 
     function getCurrentLang() {
         const user = getChatUser();
-        if (!user) return userLang; // Use global lang if no chat user
+        if (!user) return userLang;
         return getLangMap()[user] || userLang;
     }
 
@@ -349,7 +327,6 @@
                 node.dataset.translatedText = t;
                 node.dataset.translated = currentLang;
                 node.dataset.detectedLang = detected;
-                
                 p.appendChild(createTranslationLabel(detected, p));
             }
         });
@@ -373,7 +350,6 @@
     }
 
     function detectLanguage(text) {
-        // Simple heuristic-based language detection for common patterns
         const patterns = {
             en: /\b(the|and|or|is|are|was|were|have|has|been|will|would|could|should|may|might|can|do|does|did|not|but|for|with|from|this|that|these|those)\b/gi,
             es: /\b(el|la|los|las|de|que|en|un|una|por|con|para|como|es|son|está|están|fue|fueron|ser|estar|haber|hacer|tener|poder|decir|ir|ver|dar|saber|querer)\b/gi,
@@ -407,17 +383,10 @@
 
     function shouldTranslateText(text, targetLang) {
         if (text.length < 5) return false;
-
         const detected = detectLanguage(text);
-        if (detected === targetLang) {
-            return false;
-        }
-
+        if (detected === targetLang) return false;
         const alphaCount = (text.match(/[a-zA-Z\u0080-\uFFFF]/g) || []).length;
-        if (alphaCount < text.length * 0.3) {
-            return false;
-        }
-
+        if (alphaCount < text.length * 0.3) return false;
         return true;
     }
 
@@ -426,7 +395,6 @@
             if (element.matches && element.matches(selector)) return false;
             if (element.closest && element.closest(selector)) return false;
         }
-
         if (element.dataset?.originalText) return false;
         return true;
     }
@@ -440,10 +408,8 @@
                 acceptNode: (node) => {
                     const text = node.textContent.trim();
                     if (!text || text.length < 2) return NodeFilter.FILTER_REJECT;
-                    
                     const parent = node.parentElement;
                     if (!shouldTranslateElement(parent)) return NodeFilter.FILTER_REJECT;
-                    
                     return NodeFilter.FILTER_ACCEPT;
                 }
             }
@@ -460,15 +426,13 @@
         if (!shouldTranslateElement(element)) return;
 
         const textNodes = getTextNodes(element);
-        
+
         textNodes.forEach(textNode => {
             const parent = textNode.parentElement;
             const originalText = textNode.textContent.trim();
-            
+
             if (!originalText || originalText.length < 2) return;
-            if (!shouldTranslateText(originalText, userLang)) {
-                return;
-            }
+            if (!shouldTranslateText(originalText, userLang)) return;
 
             if (!parent.dataset.originalText) {
                 parent.dataset.originalText = originalText;
@@ -480,15 +444,12 @@
 
             translate(originalText, userLang, (translated, detected) => {
                 translationQueue.delete(queueKey);
-                
-
                 if (detected === userLang) return;
                 if (translated !== originalText && textNode.parentElement === parent) {
                     textNode.textContent = translated;
                     parent.dataset.translatedText = translated;
                     parent.dataset.translated = userLang;
                     parent.dataset.detectedLang = detected;
-                    
                     if (parent.tagName.match(/^(P|H[1-6]|DIV|LI|TD|TH)$/)) {
                         parent.appendChild(createTranslationLabel(detected, parent));
                     }
@@ -499,25 +460,25 @@
 
     function translateEntirePage() {
         if (userLang === "off" || isPageTranslating) return;
-        
+
         isPageTranslating = true;
         console.log('[Auto-Translator] Starting page translation to:', userLang);
 
         const elementsToTranslate = document.querySelectorAll('p, h1, h2, h3, h4, h5, h6, span, div, a, button, label, li, td, th');
-        
+
         let batchIndex = 0;
         const batchSize = 20;
-        
+
         function processBatch() {
             const start = batchIndex * batchSize;
             const end = Math.min(start + batchSize, elementsToTranslate.length);
-            
+
             for (let i = start; i < end; i++) {
                 translatePageElement(elementsToTranslate[i]);
             }
-            
+
             batchIndex++;
-            
+
             if (end < elementsToTranslate.length) {
                 setTimeout(processBatch, 100);
             } else {
@@ -525,7 +486,7 @@
                 console.log('[Auto-Translator] Page translation complete');
             }
         }
-        
+
         processBatch();
     }
 
@@ -550,7 +511,7 @@
 
         const observer = new MutationObserver((mutations) => {
             if (userLang === "off") return;
-            
+
             mutations.forEach(mutation => {
                 mutation.addedNodes.forEach(node => {
                     if (node.nodeType === Node.ELEMENT_NODE) {
@@ -559,7 +520,6 @@
                 });
             });
 
-            // Debounce translation - wait 3 seconds before processing batch
             clearTimeout(observer._debounce);
             observer._debounce = setTimeout(() => {
                 console.log(`[Auto-Translator] Processing ${pendingNodes.size} new elements`);
@@ -567,7 +527,7 @@
                     translatePageElement(node);
                 });
                 pendingNodes.clear();
-            }, 3000); // 3 seconds
+            }, 3000);
         });
 
         observer.observe(document.body, {
@@ -598,23 +558,23 @@
             box-shadow: 0 2px 10px rgba(0,0,0,0.3);
             user-select: none;
         `;
-        
+
         const updateToggleText = () => {
             const langName = userLang === 'off' ? 'OFF' : userLang.toUpperCase();
             toggle.innerHTML = `🌐 Auto-Translate: <strong>${langName}</strong>`;
         };
-        
+
         updateToggleText();
 
         toggle.onclick = () => {
             if (userLang === "off") {
                 userLang = getLanguageFromLocale(userLocale);
-                GM_setValue('globalLang', userLang);
+                localStorage.setItem('translator_globalLang', userLang);
                 isPageTranslating = false;
                 translateEntirePage();
             } else {
                 userLang = "off";
-                GM_setValue('globalLang', userLang);
+                localStorage.setItem('translator_globalLang', userLang);
                 restoreOriginalPage();
             }
             updateToggleText();
@@ -622,17 +582,18 @@
 
         document.body.appendChild(toggle);
     }
-  
+
     function initialize() {
         console.log('[Auto-Translator] Initializing...');
         userLocale = detectUserLocale();
         const detectedLang = getLanguageFromLocale(userLocale);
-        
+
         console.log('[Auto-Translator] User locale:', userLocale);
         console.log('[Auto-Translator] Detected language:', detectedLang);
-        const savedLang = GM_getValue('globalLang');
-        userLang = savedLang !== undefined ? savedLang : detectedLang;
-        
+
+        const savedLang = localStorage.getItem('translator_globalLang');
+        userLang = savedLang !== null ? savedLang : detectedLang;
+
         console.log('[Auto-Translator] Active language:', userLang);
 
         if (userLang !== "off") {
