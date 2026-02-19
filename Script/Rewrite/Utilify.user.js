@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Utilify 
 // @namespace    author @ simonvs (UID: 970332627221504081)
-// @version      3.0.3
+// @version      3.0.4 
 // @description  (Almost) personal userscript inspired by KoGaMaBuddy containing various utilities and visual enhancements. 
 // @author       Simon
 // @match        *://www.kogama.com/*
@@ -268,16 +268,19 @@
         }
     }
 
-    function removeTooltip() {
-        if (tooltip) {
-            tooltip.style.opacity = '0';
-            tooltip.style.transform = 'translateY(-5px)';
-            setTimeout(() => {
-                tooltip?.remove();
-                tooltip = null;
-            }, 200);
-        }
+function removeTooltip() {
+    if (tooltip) {
+        tooltip.style.opacity = '0';
+        tooltip.style.transform = 'translateY(-5px)';
+        const tooltipRef = tooltip;
+        tooltip = null; // Clear reference immediately
+        setTimeout(() => {
+            if (tooltipRef && tooltipRef.parentNode) {
+                tooltipRef.parentNode.removeChild(tooltipRef);
+            }
+        }, 200);
     }
+}
 
     // Bootstrap reader
     const waitForBootstrap = () => new Promise(resolve => {
@@ -355,8 +358,11 @@
 
         destroy() {
             this.observer?.disconnect();
-            this.container?.remove();
             this.cleanup?.();
+            // Check parent exists before removing
+            if (this.container && this.container.parentNode) {
+                this.container.parentNode.removeChild(this.container);
+            }
         }
     }
 
@@ -1456,52 +1462,69 @@
             color: #d0ede5;
           }
 
-          /* Plugin list styles */
-          .plugin-item {
-            background: rgba(74, 222, 183, 0.05);
-            border: 1px solid rgba(74, 222, 183, 0.15);
-            border-radius: 8px;
-            padding: 14px;
-            margin-bottom: 12px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-          }
+        /* Plugin list styles */
+        .plugin-item {
+        background: rgba(74, 222, 183, 0.05);
+        border: 1px solid rgba(74, 222, 183, 0.15);
+        border-radius: 8px;
+        padding: 14px;
+        margin-bottom: 12px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        }
 
-          .plugin-info h4 {
-            color: #4adeb7;
-            font-size: 14px;
-            margin: 0 0 4px 0;
-          }
+        .plugin-info h4 {
+        color: #4adeb7;
+        font-size: 14px;
+        margin: 0 0 4px 0;
+        }
 
-          .plugin-info p {
-            color: #8aa8a0;
-            font-size: 12px;
-            margin: 0;
-          }
+        .plugin-info p {
+        color: #8aa8a0;
+        font-size: 12px;
+        margin: 0 0 2px 0;
+        }
 
-          .plugin-controls {
-            display: flex;
-            gap: 8px;
-          }
+        .plugin-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px 14px;
+        margin-top: 6px;
+        }
 
-          .plugin-toggle {
-            padding: 6px 12px;
-            font-size: 12px;
-          }
+        .plugin-meta span {
+        color: #5c8a80;
+        font-size: 11px;
+        }
 
-          .plugin-remove {
-            background: rgba(239, 71, 111, 0.15);
-            border-color: rgba(239, 71, 111, 0.3);
-            color: #ef476f;
-            padding: 6px 12px;
-            font-size: 12px;
-          }
+        .plugin-meta span b {
+        color: #7ab8ae;
+        font-weight: 600;
+        }
 
-          .plugin-remove:hover {
-            background: rgba(239, 71, 111, 0.25);
-            border-color: rgba(239, 71, 111, 0.5);
-          }
+        .plugin-controls {
+        display: flex;
+        gap: 8px;
+        }
+
+        .plugin-toggle {
+        padding: 6px 12px;
+        font-size: 12px;
+        }
+
+        .plugin-remove {
+        background: rgba(239, 71, 111, 0.15);
+        border-color: rgba(239, 71, 111, 0.3);
+        color: #ef476f;
+        padding: 6px 12px;
+        font-size: 12px;
+        }
+
+        .plugin-remove:hover {
+        background: rgba(239, 71, 111, 0.25);
+        border-color: rgba(239, 71, 111, 0.5);
+        }
 
           /* Scrollbars */
           ::-webkit-scrollbar {
@@ -1633,121 +1656,125 @@
       }
     };
 
-    const PluginManager = {
-      loadedPlugins: new Map(),
+ const PluginManager = {
+  loadedPlugins: new Map(),
 
-      async fetchPlugin(url) {
-        return new Promise((resolve, reject) => {
-          if (typeof GM_xmlhttpRequest === 'function') {
-            GM_xmlhttpRequest({
-              method: 'GET',
-              url: url,
-              onload: (response) => {
-                if (response.status === 200) {
-                  resolve(response.responseText);
-                } else {
-                  reject(new Error(`HTTP ${response.status}`));
-                }
-              },
-              onerror: () => reject(new Error('Network error'))
-            });
-          } else {
-            fetch(url)
-              .then(r => r.ok ? r.text() : Promise.reject(new Error(`HTTP ${r.status}`)))
-              .then(resolve)
-              .catch(reject);
-          }
+  async fetchPlugin(url) {
+    return new Promise((resolve, reject) => {
+      if (typeof GM_xmlhttpRequest === 'function') {
+        GM_xmlhttpRequest({
+          method: 'GET',
+          url: url,
+          onload: (response) => {
+            if (response.status === 200) {
+              resolve(response.responseText);
+            } else {
+              reject(new Error(`HTTP ${response.status}`));
+            }
+          },
+          onerror: () => reject(new Error('Network error'))
         });
-      },
-
-      async addPlugin(url) {
-        try {
-          const code = await this.fetchPlugin(url);
-          
-          // Extract metadata from code comments
-          const nameMatch = code.match(/@name\s+(.+)/);
-          const descMatch = code.match(/@description\s+(.+)/);
-          
-          const plugin = {
-            id: Date.now().toString(),
-            name: nameMatch ? nameMatch[1].trim() : 'Unnamed Plugin',
-            description: descMatch ? descMatch[1].trim() : 'No description',
-            url: url,
-            code: code,
-            enabled: true
-          };
-
-          const plugins = Storage.getPlugins();
-          plugins.push(plugin);
-          Storage.savePlugins(plugins);
-
-          this.enablePlugin(plugin);
-          return plugin;
-        } catch (error) {
-          throw new Error(`Failed to load plugin: ${error.message}`);
-        }
-      },
-
-      enablePlugin(plugin) {
-        if (this.loadedPlugins.has(plugin.id)) return;
-
-        try {
-          const script = document.createElement('script');
-          script.id = `utilify-plugin-${plugin.id}`;
-          script.textContent = plugin.code;
-          document.head.appendChild(script);
-          this.loadedPlugins.set(plugin.id, script);
-        } catch (error) {
-          console.error(`Failed to enable plugin ${plugin.name}:`, error);
-        }
-      },
-
-      disablePlugin(plugin) {
-        const script = this.loadedPlugins.get(plugin.id);
-        if (script) {
-          script.remove();
-          this.loadedPlugins.delete(plugin.id);
-        }
-      },
-
-      removePlugin(pluginId) {
-        const plugins = Storage.getPlugins();
-        const plugin = plugins.find(p => p.id === pluginId);
-        
-        if (plugin && plugin.enabled) {
-          this.disablePlugin(plugin);
-        }
-
-        const filtered = plugins.filter(p => p.id !== pluginId);
-        Storage.savePlugins(filtered);
-      },
-
-      togglePlugin(pluginId) {
-        const plugins = Storage.getPlugins();
-        const plugin = plugins.find(p => p.id === pluginId);
-        
-        if (!plugin) return;
-
-        plugin.enabled = !plugin.enabled;
-        Storage.savePlugins(plugins);
-
-        if (plugin.enabled) {
-          this.enablePlugin(plugin);
-        } else {
-          this.disablePlugin(plugin);
-        }
-      },
-
-      loadAllPlugins() {
-        const plugins = Storage.getPlugins();
-        plugins.forEach(plugin => {
-          if (plugin.enabled) {
-            this.enablePlugin(plugin);
-          }
-        });
+      } else {
+        fetch(url)
+          .then(r => r.ok ? r.text() : Promise.reject(new Error(`HTTP ${r.status}`)))
+          .then(resolve)
+          .catch(reject);
       }
-    };
+    });
+  },
 
+  async addPlugin(url) {
+    try {
+      const code = await this.fetchPlugin(url);
+
+      // Extract structured metadata using "// Key * Value" format
+      const meta = (key) => {
+        const m = code.match(new RegExp(`\\/\\/\\s*${key}\\s*\\*\\s*(.+)`));
+        return m ? m[1].trim() : null;
+      };
+
+      const plugin = {
+        id: Date.now().toString(),
+        name:        meta('Title')       || 'Unnamed Plugin',
+        description: meta('Desc')        || 'No description',
+        version:     meta('Ver')         || null,
+        date:        meta('Date')        || null,
+        author:      meta('Auth')        || null,
+        url:         url,
+        code:        code,
+        enabled:     true
+      };
+
+      const plugins = Storage.getPlugins();
+      plugins.push(plugin);
+      Storage.savePlugins(plugins);
+
+      this.enablePlugin(plugin);
+      return plugin;
+    } catch (error) {
+      throw new Error(`Failed to load plugin: ${error.message}`);
+    }
+  },
+
+  enablePlugin(plugin) {
+    if (this.loadedPlugins.has(plugin.id)) return;
+
+    try {
+      const script = document.createElement('script');
+      script.id = `utilify-plugin-${plugin.id}`;
+      script.textContent = plugin.code;
+      document.head.appendChild(script);
+      this.loadedPlugins.set(plugin.id, script);
+    } catch (error) {
+      console.error(`Failed to enable plugin ${plugin.name}:`, error);
+    }
+  },
+
+  disablePlugin(plugin) {
+    const script = this.loadedPlugins.get(plugin.id);
+    if (script) {
+      script.remove();
+      this.loadedPlugins.delete(plugin.id);
+    }
+  },
+
+  removePlugin(pluginId) {
+    const plugins = Storage.getPlugins();
+    const plugin = plugins.find(p => p.id === pluginId);
+
+    if (plugin && plugin.enabled) {
+      this.disablePlugin(plugin);
+    }
+
+    const filtered = plugins.filter(p => p.id !== pluginId);
+    Storage.savePlugins(filtered);
+  },
+
+  togglePlugin(pluginId) {
+    const plugins = Storage.getPlugins();
+    const plugin = plugins.find(p => p.id === pluginId);
+
+    if (!plugin) return;
+
+    plugin.enabled = !plugin.enabled;
+    Storage.savePlugins(plugins);
+
+    if (plugin.enabled) {
+      this.enablePlugin(plugin);
+    } else {
+      this.disablePlugin(plugin);
+    }
+  },
+
+  loadAllPlugins() {
+    const plugins = Storage.getPlugins();
+    plugins.forEach(plugin => {
+      if (plugin.enabled) {
+        this.enablePlugin(plugin);
+      }
+    });
+  }
+};
     const RiskyFeatures = {
       pulseBlocker: { installed: false },
       friendActivity: { timer: null, observer: null, profileId: null },
@@ -2640,31 +2667,36 @@
         });
       },
 
-      renderPluginList() {
-        const container = this.panel.querySelector('#plugin-list');
-        const plugins = Storage.getPlugins();
+    renderPluginList() {
+    const container = this.panel.querySelector('#plugin-list');
+    const plugins = Storage.getPlugins();
 
-        if (plugins.length === 0) {
-          container.innerHTML = '<div class="small-note">No plugins installed.</div><div class="small-note">This feature is not fully implemented yet.</div>';
-          return;
-        }
+    if (plugins.length === 0) {
+        container.innerHTML = '<div class="small-note">No plugins installed.</div>';
+        return;
+    }
 
-        container.innerHTML = plugins.map(plugin => `
-          <div class="plugin-item">
-            <div class="plugin-info">
-              <h4>${plugin.name}</h4>
-              <p>${plugin.description}</p>
+    container.innerHTML = plugins.map(plugin => `
+        <div class="plugin-item">
+        <div class="plugin-info">
+            <h4>${plugin.name}</h4>
+            <p>${plugin.description}</p>
+            <div class="plugin-meta">
+            ${plugin.version ? `<span><b>v</b>${plugin.version}</span>` : ''}
+            ${plugin.date    ? `<span><b>Date</b> ${plugin.date}</span>` : ''}
+            ${plugin.author  ? `<span><b>By</b> ${plugin.author}</span>` : ''}
             </div>
-            <div class="plugin-controls">
-              <button class="button plugin-toggle" data-id="${plugin.id}">
-                ${plugin.enabled ? 'Disable' : 'Enable'}
-              </button>
-              <button class="button plugin-remove" data-id="${plugin.id}">Remove</button>
-            </div>
-          </div>
-        `).join('');
+        </div>
+        <div class="plugin-controls">
+            <button class="button plugin-toggle" data-id="${plugin.id}">
+            ${plugin.enabled ? 'Disable' : 'Enable'}
+            </button>
+            <button class="button plugin-remove" data-id="${plugin.id}">Remove</button>
+        </div>
+        </div>
+    `).join('');
 
-        //  Plugins - YET TO BE FULLY IMPLEMENTED!
+
         container.querySelectorAll('.plugin-toggle').forEach(btn => {
           btn.addEventListener('click', () => {
             PluginManager.togglePlugin(btn.dataset.id);
@@ -6100,8 +6132,11 @@
 			av.textContent = name
 			av.onclick = () => searchMarketplace(name, imgUrl)
 
-			wrap.innerHTML = ""
-			wrap.appendChild(av)
+        // Safe way: clear only if parent still exists
+        if (wrap.parentNode) {
+            wrap.textContent = ""; // safer than innerHTML = ""
+            wrap.appendChild(av);
+        }
 		})
 	}
 
@@ -6420,7 +6455,9 @@ av:hover {
 	window.addEventListener("load", () => {
 		setTimeout(() => {
 			enhanceAvatars()
-			setInterval(enhanceAvatars, 2000)
+			if (!window.__enhanceAvatarsInterval) {
+    window.__enhanceAvatarsInterval = setInterval(enhanceAvatars, 2000);
+}
 		}, 800)
 	})
 
@@ -6581,288 +6618,3 @@ av:hover {
   });
 })();
 
-(function () { // avatar pages | suggestion & base code by Sorry
-    'use strict';
-    function init() {
-        const API = "https://www.kogama.com/model/market/";
-        let currentPage = 1;
-        let itemsPerPage = 48;
-        const MAX_PAGE = 208;
-
-        if (!window.location.pathname.match(/^\/marketplace\/avatar\/?$/)) return;
-    function waitForElement(selector, callback) {
-        const el = document.querySelector(selector);
-        if (el) return callback(el);
-        
-        const observer = new MutationObserver(() => {
-            const el = document.querySelector(selector);
-            if (el) {
-                observer.disconnect();
-                callback(el);
-            }
-        });
-        if (document.body) {
-            observer.observe(document.body, { childList: true, subtree: true });
-        } else {
-            document.addEventListener('DOMContentLoaded', () => {
-                observer.observe(document.body, { childList: true, subtree: true });
-            });
-        }
-    }
-
-    waitForElement('.MuiTablePagination-toolbar', (originalPagination) => {
-        const ui = document.createElement("div");
-        ui.innerHTML = `
-            <div class="km-controls">
-                <button class="km-btn km-prev" title="Previous Page">
-                    <svg viewBox="0 0 24 24" width="18" height="18">
-                        <path d="M15 6L9 12L15 18" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-                    </svg>
-                </button>
-                
-                <div class="km-inputs">
-                    <div class="km-input-wrapper" data-label="page">
-                        <input class="km-page" type="number" min="1" max="${MAX_PAGE}" value="1">
-                    </div>
-                    <div class="km-input-wrapper" data-label="amount">
-                        <input class="km-count" type="number" min="10" max="100" step="12" value="48">
-                    </div>
-                </div>
-
-                <button class="km-btn km-next" title="Next Page">
-                    <svg viewBox="0 0 24 24" width="18" height="18">
-                        <path d="M9 6L15 12L9 18" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-                    </svg>
-                </button>
-            </div>
-            <div class="km-footer">Page ${MAX_PAGE} is the last valid page</div>
-        `;
-
-        const style = document.createElement("style");
-        style.textContent = `
-            .km-controls {
-                display: flex;
-                align-items: center;
-                gap: 12px;
-                padding: 12px 20px;
-                background: linear-gradient(135deg, rgba(0, 0, 0, 0.50), rgba(0, 0, 0, 0.60));
-                backdrop-filter: blur(12px);
-                border: 1px solid rgba(94, 234, 212, 0.3);
-                border-radius: 16px;
-                box-shadow: 0 8px 32px rgba(20, 184, 166, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.1);
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            }
-
-            .km-btn {
-                background: rgba(20, 184, 166, 0.2);
-                border: 1px solid rgba(94, 234, 212, 0.3);
-                padding: 10px 12px;
-                border-radius: 10px;
-                cursor: pointer;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                color: #5eead4;
-                transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-                backdrop-filter: blur(8px);
-            }
-
-            .km-btn:hover:not(:disabled) {
-                background: rgba(20, 184, 166, 0.35);
-                border-color: rgba(94, 234, 212, 0.5);
-                transform: translateY(-1px);
-                box-shadow: 0 4px 12px rgba(20, 184, 166, 0.3);
-            }
-
-            .km-btn:active:not(:disabled) {
-                transform: translateY(0);
-            }
-
-            .km-btn:disabled {
-                opacity: 0.4;
-                cursor: not-allowed;
-            }
-
-            .km-inputs {
-                display: flex;
-                gap: 12px;
-            }
-
-            .km-input-wrapper {
-                position: relative;
-                display: flex;
-                flex-direction: column;
-            }
-
-            .km-input-wrapper::before {
-                content: attr(data-label);
-                position: absolute;
-                top: -12px;
-                left: 12px;
-                font-size: 9px;
-                font-weight: 500;
-                color: rgba(94, 234, 212, 0.7);
-                text-transform: uppercase;
-                letter-spacing: 1px;
-                z-index: 10;
-                pointer-events: none;
-            }
-
-            .km-page, .km-count {
-                width: 70px;
-                padding: 10px 12px;
-                font-size: 14px;
-                font-weight: 500;
-                text-align: center;
-                border: 1px solid rgba(94, 234, 212, 0.3);
-                border-radius: 10px;
-                background: rgba(255, 255, 255, 0.08);
-                color: #f0fdfa;
-                outline: none;
-                transition: all 0.2s ease;
-                backdrop-filter: blur(8px);
-            }
-
-            .km-page:focus, .km-count:focus {
-                background: rgba(255, 255, 255, 0.12);
-                border-color: rgba(94, 234, 212, 0.6);
-                box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.15);
-            }
-
-            .km-footer {
-                margin-top: 8px;
-                padding: 6px 12px;
-                font-size: 11px;
-                text-align: center;
-                color: rgba(240, 253, 250, 0.7);
-                background: linear-gradient(135deg, rgba(0, 0, 0, 0.50), rgba(0, 0, 0, 0.60));
-                border-radius: 8px;
-                border: 1px solid rgba(94, 234, 212, 0.2);
-                backdrop-filter: blur(6px);
-            }
-
-            .km-page::-webkit-inner-spin-button,
-            .km-page::-webkit-outer-spin-button,
-            .km-count::-webkit-inner-spin-button,
-            .km-count::-webkit-outer-spin-button {
-                -webkit-appearance: none;
-                margin: 0;
-            }
-            .km-page, .km-count {
-                -moz-appearance: textfield;
-            }
-        `;
-        document.head.appendChild(style);
-        originalPagination.remove();
-        const containerStyle = document.createElement("style");
-        containerStyle.textContent = `
-            .km-floating-container {
-                position: fixed;
-                bottom: 24px;
-                left: 50%;
-                transform: translateX(-50%);
-                z-index: 999999;
-                display: flex;
-                flex-direction: column;
-                gap: 8px;
-                align-items: center;
-            }
-        `;
-        document.head.appendChild(containerStyle);
-        
-        const container = document.createElement("div");
-        container.className = "km-floating-container";
-        container.appendChild(ui);
-        document.body.appendChild(container);
-
-        const prevBtn = ui.querySelector('.km-prev');
-        const nextBtn = ui.querySelector('.km-next');
-        const pageInput = ui.querySelector('.km-page');
-        const countInput = ui.querySelector('.km-count');
-        async function loadPage(page, count = itemsPerPage) {
-            if (page < 1 || page > MAX_PAGE) return;
-
-            currentPage = page;
-            itemsPerPage = Math.max(10, Math.min(100, count));
-            
-            pageInput.value = page;
-            countInput.value = itemsPerPage;
-            prevBtn.disabled = page <= 1;
-            nextBtn.disabled = page >= MAX_PAGE;
-
-            const url = `${API}?page=${page}&count=${itemsPerPage}&order=undefined&category=avatar&popular=1`;
-
-            try {
-                const res = await fetch(url, { credentials: "include" });
-                const json = await res.json();
-                if (!json.data) return;
-
-                const grid = document.querySelector('[class*="MuiGrid-container"]');
-                if (!grid) return;
-
-                grid.innerHTML = "";
-
-                json.data.forEach(item => {
-                    const link = document.createElement("a");
-                    link.href = `/marketplace/avatar/a-${item.id}/`;
-                    link.className = 'MuiGrid-root MuiGrid-item';
-                    link.style.cssText = 'text-decoration: none; color: inherit; max-width: 120px; margin: 8px;';
-
-                    const imgWrapper = document.createElement("div");
-                    imgWrapper.style.cssText = 'position: relative; border-radius: 8px; overflow: hidden;';
-                    
-                    const img = document.createElement("img");
-                    img.src = item.image_large || item.image_medium || item.image_small;
-                    img.style.cssText = 'width: 100%; display: block;';
-                    img.alt = item.name || 'Avatar';
-                    
-                    const nameDiv = document.createElement("div");
-                    nameDiv.textContent = item.name || 'Unnamed';
-                    nameDiv.style.cssText = 'margin-top: 6px; font-size: 12px; color: #e0e0e0; text-align: center; font-weight: 400; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;';
-
-                    imgWrapper.appendChild(img);
-                    link.appendChild(imgWrapper);
-                    link.appendChild(nameDiv);
-                    grid.appendChild(link);
-                });
-            } catch (err) {
-                console.error('KoGama Pagination Error:', err);
-            }
-        }
-
-        prevBtn.onclick = () => loadPage(currentPage - 1, itemsPerPage);
-        nextBtn.onclick = () => loadPage(currentPage + 1, itemsPerPage);
-
-        pageInput.addEventListener('keydown', e => {
-            if (e.key === 'Enter') {
-                const page = parseInt(pageInput.value);
-                if (page > 0 && page <= MAX_PAGE) loadPage(page, itemsPerPage);
-            }
-        });
-
-        pageInput.addEventListener('blur', () => {
-            const page = parseInt(pageInput.value);
-            if (page > 0 && page <= MAX_PAGE) loadPage(page, itemsPerPage);
-        });
-
-        countInput.addEventListener('keydown', e => {
-            if (e.key === 'Enter') {
-                const count = parseInt(countInput.value);
-                loadPage(currentPage, count);
-            }
-        });
-
-        countInput.addEventListener('blur', () => {
-            const count = parseInt(countInput.value);
-            loadPage(currentPage, count);
-        });
-        loadPage(1, 50);
-    });
-    }
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', init);
-    } else {
-        init();
-    }
-
-})();
