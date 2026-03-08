@@ -1,5 +1,5 @@
 // Title * Google Translator
-// Desc * A built-in translator to ease communication. Toggle the popout by entering  `-t` into any text field. Remain cautious with descriptions, use within those is not recommended.
+// Desc * A built-in translator to ease communication. Toggle the popout by entering  -t into any text field. Remain cautious with descriptions, use within those is not recommended.
 // Ver * 3.0
 // Date * 8 Mar 2026
 // Auth * Lappy, Haden
