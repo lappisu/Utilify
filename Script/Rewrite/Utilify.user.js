@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Utilify 
 // @namespace    author @ simonvs (UID: 970332627221504081)
-// @version      3.0.5
+// @version      3.0.6
 // @description  (Almost) personal userscript inspired by KoGaMaBuddy containing various utilities and visual enhancements. 
 // @author       Simon
 // @match        *://www.kogama.com/*
@@ -6633,4 +6633,500 @@ bootstrap();
       startObserver();
     }).observe(document, { childList: true });
   }
+})();
+
+
+(() => {
+  "use strict";
+
+  const CONFIG = {
+    CONTACT: "@simonvhs",
+  };
+
+  let janitorRunning = true;
+  let janitorInterval = null;
+
+  const _native = {
+    log:      console.log.bind(console),
+    warn:     console.warn.bind(console),
+    error:    console.error.bind(console),
+    info:     console.info.bind(console),
+    debug:    console.debug.bind(console),
+    clear:    console.clear.bind(console),
+    group:    console.group.bind(console),
+    groupEnd: console.groupEnd.bind(console),
+  };
+
+  const printBranded = () => {
+    _native.clear();
+
+    _native.log(
+      "%cU T I L I F Y%c  DevTools Janitor  %cv1.0.0",
+      "background:#003049;color:#00b4d8;font-size:13px;font-weight:800;padding:5px 12px;border-radius:4px 0 0 4px;letter-spacing:.15em",
+      "background:#023e5c;color:#90e0ef;font-size:13px;padding:5px 10px",
+      "background:#012840;color:#caf0f8;font-size:13px;padding:5px 10px;border-radius:0 4px 4px 0"
+    );
+
+    _native.log(
+      "%c⚠  SECURITY NOTICE",
+      "background:#1a0a00;color:#ff6b35;font-size:13px;font-weight:700;padding:5px 14px;border-left:4px solid #ff6b35;letter-spacing:.05em"
+    );
+    _native.warn(
+      "%cDo NOT paste anything into this console unless you fully understand its contents.",
+      "color:#ffd166;font-size:12px"
+    );
+    _native.warn(
+      "%cMalicious scripts pasted here can steal your account, session tokens, and personal data.",
+      "color:#ef476f;font-size:12px"
+    );
+    _native.log(
+      "%cIf you believe something is malicious or suspicious, do NOT proceed.",
+      "color:#06d6a0;font-size:12px"
+    );
+    _native.log(
+      `%cContact the developer: ${CONFIG.CONTACT}`,
+      "color:#8ecae6;font-size:12px;text-decoration:underline"
+    );
+    _native.log(
+      "%cTo stop janitor, run:  utilify.stopjanitor",
+      "color:#666;font-size:11px;font-style:italic"
+    );
+  };
+
+  const startLoop = () => {
+    printBranded();
+    janitorInterval = setInterval(() => {
+      if (!janitorRunning) return;
+      printBranded();
+    }, 1500);
+  };
+
+  window.utilify = Object.assign(window.utilify || {}, {
+
+    stopjanitor() {
+      janitorRunning = false;
+      clearInterval(janitorInterval);
+      _native.log(
+        "%c■ utilify%c  Janitor stopped. Native console restored.",
+        "background:#1a0000;color:#ef476f;font-weight:700;padding:3px 8px;border-radius:3px",
+        "color:#aaa"
+      );
+    },
+
+  });
+
+  startLoop();
+
+})();
+
+
+(function () {
+  'use strict';
+
+  const IMGUR_CLIENT_ID  = 'f0ea04148a54268'; // swap if rate-limited
+  const INSERT_FORMAT    = 'url';
+  const SHOW_TOAST       = true;
+  const TOOLTIP_DEFAULT  = 260;               // default preview width in px
+  const TOOLTIP_MIN      = 80;
+  const TOOLTIP_MAX      = 640;
+  const TOOLTIP_STEP     = 32;               // px per scroll tick
+  const HOVER_DELAY_MS   = 120;              // ms before tooltip appears
+  const IMGUR_RE = /https?:\/\/(?:i(?:%2E|\.)imgur(?:%2E|\.)com\/([A-Za-z0-9]+(?:%2E|\.)[a-zA-Z]{2,5})|imgur(?:%2E|\.)com\/([A-Za-z0-9]+))/gi;
+  function normaliseImgurUrl(raw) {
+    const decoded = raw.replace(/%2E/gi, '.').replace(/%2F/gi, '/');
+    if (/^https?:\/\/i\.imgur\.com\//i.test(decoded)) return decoded;
+    const id = decoded.match(/imgur\.com\/([A-Za-z0-9]+)/i)?.[1];
+    if (id) return `https://i.imgur.com/${id}.jpeg`;
+    return decoded;
+  }
+
+  function extractImgurUrl(text) {
+    IMGUR_RE.lastIndex = 0;
+    const m = IMGUR_RE.exec(text);
+    return m ? normaliseImgurUrl(m[0]) : null;
+  }
+  const style = document.createElement('style');
+  style.textContent = `
+    #__piu-toast {
+      position: fixed; bottom: 24px; right: 24px; z-index: 2147483645;
+      background: rgba(15,15,20,.88);
+      backdrop-filter: blur(12px) saturate(180%);
+      -webkit-backdrop-filter: blur(12px) saturate(180%);
+      border: 1px solid rgba(255,255,255,.1);
+      color: #e8e8f0; font: 13px/1.5 monospace;
+      padding: 10px 16px; border-radius: 10px;
+      box-shadow: 0 4px 24px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.07);
+      max-width: 340px; word-break: break-all;
+      opacity: 0; transform: translateY(8px);
+      transition: opacity .2s, transform .2s;
+      pointer-events: none;
+    }
+    #__piu-toast.show  { opacity: 1; transform: translateY(0); }
+    #__piu-toast.error { background: rgba(100,10,10,.9); border-color: rgba(255,80,80,.25); }
+    #__piu-toast .piu-label {
+      font-size: 10px; opacity: .5; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 2px;
+    }
+
+    #__piu-tip {
+      position: fixed; z-index: 2147483647;
+      pointer-events: none;
+      opacity: 0;
+      transform: scale(.96) translateY(6px);
+      transition: opacity .18s cubic-bezier(.22,1,.36,1),
+                  transform .18s cubic-bezier(.22,1,.36,1),
+                  width .12s ease;
+      transform-origin: top left;
+    }
+    #__piu-tip.visible {
+      opacity: 1;
+      transform: scale(1) translateY(0);
+      pointer-events: auto;            /* allow scroll wheel */
+    }
+
+    #__piu-tip-inner {
+      border-radius: 14px;
+      overflow: hidden;
+      background: rgba(18,18,28,.72);
+      backdrop-filter: blur(22px) saturate(200%);
+      -webkit-backdrop-filter: blur(22px) saturate(200%);
+      border: 1px solid rgba(255,255,255,.14);
+      box-shadow:
+        0 8px 32px rgba(0,0,0,.55),
+        0 2px  8px rgba(0,0,0,.35),
+        inset 0 1px 0 rgba(255,255,255,.1),
+        inset 0 -1px 0 rgba(0,0,0,.2);
+    }
+
+    #__piu-tip img {
+      display: block;
+      width: 100%; height: auto;
+      border-radius: 13px 13px 0 0;
+      image-rendering: auto;
+    }
+
+    #__piu-tip-loader {
+      display: flex; align-items: center; justify-content: center;
+      height: 120px;
+      background: linear-gradient(90deg,
+        rgba(255,255,255,.04) 25%,
+        rgba(255,255,255,.10) 50%,
+        rgba(255,255,255,.04) 75%);
+      background-size: 200% 100%;
+      animation: __piu-shimmer 1.4s infinite;
+      border-radius: 13px 13px 0 0;
+    }
+    @keyframes __piu-shimmer {
+      0%   { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+    #__piu-tip-loader svg {
+      opacity: .25;
+      animation: __piu-spin 1s linear infinite;
+    }
+    @keyframes __piu-spin { to { transform: rotate(360deg); } }
+
+    #__piu-tip-footer {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 7px 11px 8px;
+      gap: 8px;
+    }
+    #__piu-tip-url {
+      font: 11px/1.4 monospace;
+      color: rgba(180,185,220,.65);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      flex: 1;
+    }
+    #__piu-tip-hint {
+      font: 10px/1 sans-serif;
+      color: rgba(255,255,255,.22);
+      white-space: nowrap; flex-shrink: 0;
+    }
+    #__piu-tip-hint span {
+      display: inline-block;
+      border: 1px solid rgba(255,255,255,.18);
+      border-radius: 4px;
+      padding: 1px 5px;
+      font-size: 9px;
+      line-height: 14px;
+      background: rgba(255,255,255,.07);
+    }
+
+    /* linkified imgur anchors */
+    a.__piu-link {
+      cursor: zoom-in !important;
+      text-decoration: underline dotted rgba(120,160,255,.6) !important;
+      text-underline-offset: 3px;
+    }
+  `;
+  document.head.appendChild(style);
+  let toastEl, toastTimer;
+  function toast(msg, isError = false) {
+    if (!SHOW_TOAST) return;
+    if (!toastEl) {
+      toastEl = document.createElement('div');
+      toastEl.id = '__piu-toast';
+      document.body.appendChild(toastEl);
+    }
+    clearTimeout(toastTimer);
+    toastEl.className = isError ? 'error' : '';
+    toastEl.innerHTML = `<div class="piu-label">${isError ? '✖ upload failed' : '✔ uploaded'}</div>${msg}`;
+    void toastEl.offsetWidth;
+    toastEl.classList.add('show');
+    toastTimer = setTimeout(() => toastEl.classList.remove('show'), 4000);
+  }
+
+  let tipEl, tipInner, tipImg, tipLoader, tipUrl, tipHint;
+  let tipWidth   = TOOLTIP_DEFAULT;
+  let tipVisible = false;
+  let hideTimer, showTimer;
+  let currentUrl = null;
+
+  function buildTooltip() {
+    tipEl = document.createElement('div');
+    tipEl.id = '__piu-tip';
+
+    tipInner = document.createElement('div');
+    tipInner.id = '__piu-tip-inner';
+
+    tipLoader = document.createElement('div');
+    tipLoader.id = '__piu-tip-loader';
+    tipLoader.innerHTML = `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+      <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+    </svg>`;
+
+    tipImg = document.createElement('img');
+    tipImg.style.display = 'none';
+    tipImg.onload  = () => { tipLoader.style.display = 'none'; tipImg.style.display = 'block'; };
+    tipImg.onerror = () => { tipLoader.innerHTML = '<span style="color:rgba(255,100,100,.5);font:12px monospace">failed to load</span>'; };
+    const footer = document.createElement('div');
+    footer.id = '__piu-tip-footer';
+
+    tipUrl = document.createElement('div');
+    tipUrl.id = '__piu-tip-url';
+
+    tipHint = document.createElement('div');
+    tipHint.id = '__piu-tip-hint';
+    tipHint.innerHTML = `scroll <span>⇕</span> to resize`;
+
+    footer.appendChild(tipUrl);
+    footer.appendChild(tipHint);
+
+    tipInner.appendChild(tipLoader);
+    tipInner.appendChild(tipImg);
+    tipInner.appendChild(footer);
+    tipEl.appendChild(tipInner);
+    document.body.appendChild(tipEl);
+    tipEl.addEventListener('wheel', onTipWheel, { passive: false });
+  }
+
+  function onTipWheel(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    const delta = e.deltaY > 0 ? -TOOLTIP_STEP : TOOLTIP_STEP;
+    tipWidth = Math.min(TOOLTIP_MAX, Math.max(TOOLTIP_MIN, tipWidth + delta));
+    tipEl.style.width = tipWidth + 'px';
+  }
+
+  function positionTip(mx, my) {
+    if (!tipEl) return;
+    const vw = window.innerWidth, vh = window.innerHeight;
+    const w  = tipWidth;
+    let x = mx + 18;
+    if (x + w > vw - 12) x = mx - w - 18;
+    let y = my + 18;
+    const estH = tipWidth * 0.75 + 52;
+    if (y + estH > vh - 12) y = Math.max(8, my - estH - 10);
+
+    tipEl.style.left  = x + 'px';
+    tipEl.style.top   = y + 'px';
+    tipEl.style.width = w + 'px';
+  }
+
+  function showTip(url, mx, my) {
+    if (!tipEl) buildTooltip();
+    clearTimeout(hideTimer);
+
+    const changed = (url !== currentUrl);
+    currentUrl = url;
+
+    if (changed) {
+      tipImg.style.display = 'none';
+      tipImg.src = '';
+      tipLoader.style.display = 'flex';
+      tipLoader.innerHTML = `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+        <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+      </svg>`;
+      tipUrl.textContent = url;
+      tipImg.src = url;
+    }
+
+    positionTip(mx, my);
+    tipEl.classList.add('visible');
+    tipVisible = true;
+  }
+
+  function hideTip(delay = 80) {
+    clearTimeout(hideTimer);
+    hideTimer = setTimeout(() => {
+      if (tipEl) tipEl.classList.remove('visible');
+      tipVisible = false;
+    }, delay);
+  }
+
+  let lastMx = 0, lastMy = 0;
+
+  function imgurUrlFromElement(el) {
+    if (el.tagName === 'A') {
+      const href = el.getAttribute('href') || '';
+      const u = extractImgurUrl(decodeURIComponent(href));
+      if (u) return u;
+    }
+    const text = el.textContent || '';
+    if (text.length < 500) {
+      const u = extractImgurUrl(text);
+      if (u) return u;
+    }
+    return null;
+  }
+
+  document.addEventListener('mousemove', e => {
+    lastMx = e.clientX; lastMy = e.clientY;
+    clearTimeout(showTimer);
+
+    let found = null;
+    let node  = e.target;
+    for (let i = 0; i < 5 && node && node !== document.body; i++, node = node.parentElement) {
+      found = imgurUrlFromElement(node);
+      if (found) break;
+    }
+
+    if (found) {
+      showTimer = setTimeout(() => showTip(found, lastMx, lastMy), HOVER_DELAY_MS);
+    } else {
+      clearTimeout(showTimer);
+      if (tipVisible) hideTip();
+    }
+  }, true);
+
+  document.addEventListener('mousemove', e => {
+    if (tipVisible && tipEl && tipEl.contains(e.target)) {
+      clearTimeout(hideTimer);
+    }
+  });
+
+  function linkifyNode(node) {
+    if (node.nodeType !== Node.TEXT_NODE) return;
+    const text = node.textContent;
+    IMGUR_RE.lastIndex = 0;
+    if (!IMGUR_RE.test(text)) return;
+
+    IMGUR_RE.lastIndex = 0;
+    const frag = document.createDocumentFragment();
+    let last = 0, m;
+    while ((m = IMGUR_RE.exec(text)) !== null) {
+      if (m.index > last) frag.appendChild(document.createTextNode(text.slice(last, m.index)));
+      const a  = document.createElement('a');
+      const nu = normaliseImgurUrl(m[0]);
+      a.href      = nu;
+      a.className = '__piu-link';
+      a.textContent = m[0];
+      frag.appendChild(a);
+      last = m.index + m[0].length;
+    }
+    if (last < text.length) frag.appendChild(document.createTextNode(text.slice(last)));
+    node.parentNode.replaceChild(frag, node);
+  }
+
+  function linkifySubtree(root) {
+    if (!root || root.nodeType !== Node.ELEMENT_NODE) return;
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+      acceptNode(node) {
+        const p = node.parentElement;
+        if (!p) return NodeFilter.FILTER_REJECT;
+        if (/^(SCRIPT|STYLE|A|TEXTAREA|INPUT)$/.test(p.tagName)) return NodeFilter.FILTER_REJECT;
+        if (p.closest('a')) return NodeFilter.FILTER_REJECT;
+        return NodeFilter.FILTER_ACCEPT;
+      }
+    });
+    const nodes = [];
+    let n;
+    while ((n = walker.nextNode())) nodes.push(n);
+    nodes.forEach(linkifyNode);
+  }
+
+  linkifySubtree(document.body);
+
+  new MutationObserver(muts => {
+    for (const mut of muts)
+      for (const node of mut.addedNodes) {
+        if (node.nodeType === Node.ELEMENT_NODE) linkifySubtree(node);
+        else if (node.nodeType === Node.TEXT_NODE) linkifyNode(node);
+      }
+  }).observe(document.body, { childList: true, subtree: true });
+
+  function formatURL(url) {
+    if (INSERT_FORMAT === 'markdown') return `![image](${url})`;
+    if (INSERT_FORMAT === 'bbcode')   return `[img]${url}[/img]`;
+    return url;
+  }
+
+  function insertAtCursor(target, text) {
+    if (target.isContentEditable) {
+      const sel = window.getSelection();
+      if (!sel.rangeCount) return;
+      const range = sel.getRangeAt(0);
+      range.deleteContents();
+      range.insertNode(document.createTextNode(text));
+      range.collapse(false);
+      sel.removeAllRanges(); sel.addRange(range);
+      target.dispatchEvent(new InputEvent('input', { bubbles: true }));
+    } else {
+      const s = target.selectionStart, e2 = target.selectionEnd, v = target.value;
+      target.value = v.slice(0, s) + text + v.slice(e2);
+      target.selectionStart = target.selectionEnd = s + text.length;
+      target.dispatchEvent(new InputEvent('input', { bubbles: true }));
+    }
+  }
+  async function uploadToImgur(blob) {
+    const form = new FormData();
+    form.append('image', blob);
+    form.append('type', 'file');
+    const res  = await fetch('https://api.imgur.com/3/image', {
+      method: 'POST',
+      headers: { Authorization: `Client-ID ${IMGUR_CLIENT_ID}` },
+      body: form,
+    });
+    const json = await res.json();
+    if (!res.ok || !json.success) throw new Error(json?.data?.error || `HTTP ${res.status}`);
+    return json.data.link;
+  }
+
+  async function onPaste(e) {
+    const target = e.target;
+    const isEditable =
+      target.isContentEditable ||
+      target.tagName === 'TEXTAREA' ||
+      (target.tagName === 'INPUT' && /^(text|search|url|email)$/i.test(target.type || 'text'));
+    if (!isEditable) return;
+
+    const imageItem = Array.from(e.clipboardData?.items || []).find(i => i.type.startsWith('image/'));
+    if (!imageItem) return;
+
+    e.preventDefault(); e.stopPropagation();
+    const blob = imageItem.getAsFile();
+    if (!blob) return;
+
+    toast('uploading…');
+    try {
+      const url = await uploadToImgur(blob);
+      insertAtCursor(target, formatURL(url));
+      toast(url);
+    } catch (err) {
+      console.error('[PasteImageUploader]', err);
+      toast(String(err.message || err), true);
+    }
+  }
+
+  document.addEventListener('paste', onPaste, true);
+
 })();
